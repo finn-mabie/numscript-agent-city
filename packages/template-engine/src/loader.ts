@@ -1,6 +1,20 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import Ajv, { type ValidateFunction } from "ajv";
 import type { Template, TemplateSchema } from "./types.js";
+import { META_SCHEMA } from "./meta-schema.js";
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validateMeta: ValidateFunction = ajv.compile(META_SCHEMA);
+
+function assertValidSchema(id: string, schema: unknown): asserts schema is TemplateSchema {
+  if (!validateMeta(schema)) {
+    const errs = (validateMeta.errors ?? [])
+      .map((e) => `${e.instancePath || "<root>"} ${e.message ?? ""}`)
+      .join("; ");
+    throw new Error(`Invalid template schema for "${id}": ${errs}`);
+  }
+}
 
 export async function loadTemplate(rootDir: string, id: string): Promise<Template> {
   const dir = join(rootDir, id);
@@ -10,7 +24,9 @@ export async function loadTemplate(rootDir: string, id: string): Promise<Templat
     readFile(join(dir, "example.json"), "utf8"),
     readFile(join(dir, "README.md"), "utf8")
   ]);
-  const schema = JSON.parse(schemaRaw) as TemplateSchema;
+  const parsed = JSON.parse(schemaRaw);
+  assertValidSchema(id, parsed);
+  const schema = parsed;
   if (schema.id !== id) {
     throw new Error(`Template id mismatch: dir=${id}, schema.id=${schema.id}`);
   }
