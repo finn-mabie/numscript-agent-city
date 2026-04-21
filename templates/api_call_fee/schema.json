@@ -1,0 +1,10 @@
+{
+  "id": "api_call_fee",
+  "description": "Pay a provider for N calls at a price read from the provider's account metadata.",
+  "params": {
+    "caller":   { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "provider": { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "units":    { "type": "number",  "minimum": 1, "maximum": 10000 },
+    "call_ref": { "type": "string",  "maxLength": 64 }
+  }
+}

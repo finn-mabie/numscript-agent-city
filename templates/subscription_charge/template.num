@@ -1,0 +1,14 @@
+vars {
+  monetary $amount
+  account  $subscriber
+  account  $provider
+  string   $period_ref
+}
+
+send $amount (
+  source      = $subscriber
+  destination = $provider
+)
+
+set_tx_meta("type",       "SUBSCRIPTION_CHARGE")
+set_tx_meta("period_ref", $period_ref)

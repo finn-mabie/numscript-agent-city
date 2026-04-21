@@ -1,0 +1,6 @@
+{
+  "caller":   "@agents:002:available",
+  "provider": "@agents:005:available",
+  "units":    10,
+  "call_ref": "req-abc"
+}

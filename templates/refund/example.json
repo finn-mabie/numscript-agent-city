@@ -1,0 +1,6 @@
+{
+  "amount":          { "asset": "USD/2", "amount": 250 },
+  "merchant":        "@agents:007:available",
+  "customer":        "@agents:002:available",
+  "original_tx_ref": "gig-001"
+}

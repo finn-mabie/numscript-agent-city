@@ -1,0 +1,16 @@
+vars {
+  account  $caller
+  account  $provider
+  monetary $unit_price = meta($provider, "unit_price")
+  number   $units
+  string   $call_ref
+}
+
+send mul($unit_price, $units) (
+  source      = $caller
+  destination = $provider
+)
+
+set_tx_meta("type",     "API_CALL_FEE")
+set_tx_meta("call_ref", $call_ref)
+set_tx_meta("units",    $units)

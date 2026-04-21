@@ -1,0 +1,14 @@
+vars {
+  monetary $amount
+  account  $merchant
+  account  $customer
+  string   $original_tx_ref
+}
+
+send $amount (
+  source      = $merchant
+  destination = $customer
+)
+
+set_tx_meta("type",            "REFUND")
+set_tx_meta("original_tx_ref", $original_tx_ref)

@@ -1,0 +1,10 @@
+{
+  "id": "subscription_charge",
+  "description": "Recurring charge keyed by period. Idempotent — invoking twice for the same period_ref is a no-op.",
+  "params": {
+    "amount":     { "type": "monetary", "asset": "USD/2", "max": "200_00", "min": "1" },
+    "subscriber": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "provider":   { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "period_ref": { "type": "string",   "pattern": "^[a-zA-Z0-9_-]+:[0-9]{4}-[0-9]{2}-[0-9]{2}$", "maxLength": 64 }
+  }
+}

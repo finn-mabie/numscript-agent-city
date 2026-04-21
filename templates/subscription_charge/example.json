@@ -1,0 +1,6 @@
+{
+  "amount":     { "asset": "USD/2", "amount": 500 },
+  "subscriber": "@agents:002:available",
+  "provider":   "@agents:004:available",
+  "period_ref": "sub-dave:2026-04-01"
+}
