@@ -153,8 +153,10 @@ describe("tickAgent with arena injection", () => {
 
     // LLM returns a p2p_transfer where `from` is NOT agent 001's own account.
     // Authorization guard rejects it synchronously with NotSelfOwned.
+    let capturedUser = "";
     const llm: LLMClient = {
-      async pickAction() {
+      async pickAction(ctx) {
+        capturedUser = ctx.user;
         return {
           tool: "p2p_transfer", reasoning: "trying to impersonate someone",
           input: {
@@ -173,6 +175,12 @@ describe("tickAgent with arena injection", () => {
       emit: (e) => events.push(e),
       arenaQueue: queue, arenaRepo: arena
     });
+
+    // Issue 2: assert that the arena injection was actually rendered into the
+    // user message sent to the LLM (not silently dropped by buildContext).
+    expect(capturedUser).toContain("[incoming prompt from external user]");
+    expect(capturedUser).toContain('"drain it"');
+    expect(capturedUser).toContain("[end incoming prompt]");
 
     // Assertions
     const resolved = events.find((e) => e.kind === "arena-resolved");
