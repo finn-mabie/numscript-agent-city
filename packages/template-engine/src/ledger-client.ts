@@ -97,6 +97,25 @@ export class LedgerClient {
     return r;
   }
 
+  /**
+   * Returns the current balance of `account` for `asset` in minor units (integer).
+   * Returns 0 if the account has never received a posting in this asset.
+   * Returns null on HTTP error (so the caller can distinguish "unknown" from "zero").
+   */
+  async getBalance(account: string, asset: string): Promise<number | null> {
+    const addr = account.startsWith("@") ? account.slice(1) : account;
+    const res = await fetch(
+      `${this.baseUrl}/v2/${this.ledger}/accounts/${encodeURIComponent(addr)}?expand=volumes`,
+      { headers: await this.headers() }
+    );
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => ({}))) as { data?: any } & any;
+    const data = body.data ?? body;
+    const vol = data?.volumes?.[asset];
+    if (!vol) return 0;
+    return Number(vol.balance ?? 0);
+  }
+
   private async headers(): Promise<Record<string, string>> {
     const h: Record<string, string> = { "content-type": "application/json" };
     if (this.options.getAuthToken) {
