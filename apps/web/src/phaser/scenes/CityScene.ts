@@ -103,11 +103,11 @@ export class CityScene extends Phaser.Scene {
     const y = src.worldY() - 11;
     const label = this.add.text(x, y, `⋯ ${templateId}`, {
       fontFamily: "ui-monospace, monospace",
-      fontSize: "6px",
+      fontSize: "9px",
       color: "#ede8df",
       backgroundColor: "#3a3732",
-      padding: { left: 2, right: 2, top: 1, bottom: 1 }
-    }).setOrigin(0.5, 1).setAlpha(0);
+      padding: { left: 4, right: 4, top: 2, bottom: 2 }
+    }).setOrigin(0.5, 1).setAlpha(0).setResolution(3);
     this.tweens.add({ targets: label, alpha: 1, duration: 180, ease: "cubic.out" });
     this.thinking.set(tickId, [label]);
     // Safety timeout — clear if no terminal event arrives in 8s.
@@ -174,9 +174,10 @@ export class CityScene extends Phaser.Scene {
       this.add.rectangle(cx, cy - 1, W * 0.5, 2, 0x6e6a62); // --dim
       this.add.text(cx, cy - H / 2 - 2, d.label, {
         fontFamily: "ui-monospace, monospace",
-        fontSize: "7px",
-        color: "#ede8df"
-      }).setOrigin(0.5, 1);
+        fontSize: "10px",
+        color: "#ede8df",
+        fontStyle: "500"
+      }).setOrigin(0.5, 1).setResolution(3);
     }
   }
 }

@@ -25,13 +25,15 @@ export class AgentSprite {
       .setTint(this.hexToNumber(agent.color));
     this.label = scene.add.text(this.px(), this.py() - TILE * 0.75, agent.name, {
       fontFamily: "ui-monospace, monospace",
-      fontSize: "6px",
-      color: "#e8e8e6"
-    }).setOrigin(0.5, 1);
+      fontSize: "9px",
+      color: "#ede8df"
+    }).setOrigin(0.5, 1).setResolution(3);
 
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on("pointerover", () => {
-      window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: { id: agent.id, x: this.px() * 3, y: this.py() * 3 } }));
+      // Scale by canvas zoom factor (4 — see boot.ts) so the HTML hover card
+      // positions correctly over the screen pixel of the sprite.
+      window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: { id: agent.id, x: this.px() * 4, y: this.py() * 4 } }));
     });
     this.sprite.on("pointerout", () => {
       window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: null }));

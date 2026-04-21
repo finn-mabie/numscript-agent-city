@@ -8,15 +8,16 @@ export function floatPopup(
 ): void {
   const t = scene.add.text(x, y, text, {
     fontFamily: "ui-monospace, monospace",
-    fontSize: "7px",
-    color
-  }).setOrigin(0.5, 1);
+    fontSize: "11px",
+    color,
+    fontStyle: "bold"
+  }).setOrigin(0.5, 1).setResolution(3);
 
   scene.tweens.add({
     targets: t,
-    y: y - 20,
+    y: y - 28,
     alpha: 0,
-    duration: 1200,
+    duration: 1600,
     ease: "cubic.out",
     onComplete: () => t.destroy()
   });
@@ -32,16 +33,17 @@ export function floatPopupClickable(
 ): void {
   const t = scene.add.text(x, y, text, {
     fontFamily: "ui-monospace, monospace",
-    fontSize: "7px",
-    color
-  }).setOrigin(0.5, 1);
+    fontSize: "11px",
+    color,
+    fontStyle: "bold"
+  }).setOrigin(0.5, 1).setResolution(3);
   t.setInteractive({ useHandCursor: true }).on("pointerdown", onClick);
 
   scene.tweens.add({
     targets: t,
-    y: y - 20,
+    y: y - 28,
     alpha: 0,
-    duration: 1800,
+    duration: 2200,
     ease: "cubic.out",
     onComplete: () => t.destroy()
   });

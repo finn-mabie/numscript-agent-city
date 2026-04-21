@@ -9,7 +9,7 @@ export function bootPhaser(parent: HTMLElement): Phaser.Game {
     height: GRID_H * TILE,
     pixelArt: true,
     antialias: false,
-    zoom: 3,
+    zoom: 4,
     backgroundColor: "#1a2f1a",
     scene: [CityScene]
   });

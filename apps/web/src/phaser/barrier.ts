@@ -13,26 +13,28 @@ export function showBarrier(scene: Phaser.Scene, x: number, y: number, kind: Bar
     kind === "commit"        ? 0xb22222 :    // deep red (ledger)
     0x888888;                                // gray (other)
 
-  const ring = scene.add.circle(x, y, 2, color).setStrokeStyle(1, color);
+  const ring = scene.add.circle(x, y, 3, color, 0).setStrokeStyle(2, color);
   scene.tweens.add({
     targets: ring,
-    radius: 12,
+    radius: 18,
     alpha: 0,
-    duration: 600,
+    duration: 900,
     ease: "cubic.out",
     onComplete: () => ring.destroy()
   });
 
-  const label = scene.add.text(x, y + 3, code, {
+  const label = scene.add.text(x, y + 4, code, {
     fontFamily: "ui-monospace, monospace",
-    fontSize: "6px",
-    color: "#ec3a2d"
-  }).setOrigin(0.5, 0);
+    fontSize: "10px",
+    color: "#ec3a2d",
+    fontStyle: "bold"
+  }).setOrigin(0.5, 0).setResolution(3);
   scene.tweens.add({
     targets: label,
-    y: y + 14,
+    y: y + 24,
     alpha: 0,
-    duration: 900,
+    duration: 1400,
+    ease: "cubic.out",
     onComplete: () => label.destroy()
   });
 }
