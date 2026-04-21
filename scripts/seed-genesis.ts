@@ -121,4 +121,20 @@ set_tx_meta("type", "GENESIS_SEED")`,
   else console.error(`yield pool: ${r.code} ${r.message}`);
 }
 
+// Seed the liquidity pool — Heidi's LLM naturally names this pool, so we seed
+// it alongside yield to match her mental model and enable live revenue_split calls.
+{
+  const r = await client.commit({
+    plain: `send [USD/2 50000] (
+  source      = @mint:genesis allowing unbounded overdraft
+  destination = @platform:pool:liquidity-main
+)
+set_tx_meta("type", "GENESIS_SEED")`,
+    vars: {},
+    reference: "genesis:pool:liquidity-main"
+  });
+  if (r.ok) console.log("✓ seeded platform:pool:liquidity-main");
+  else console.error(`liquidity pool: ${r.code} ${r.message}`);
+}
+
 console.log("\nGenesis complete.");

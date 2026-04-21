@@ -58,16 +58,46 @@ export function buildContext(input: ContextInput): BuiltContext {
     ? "You are nearly broke. Prioritize earning. Offer services at reduced fees if needed.\n"
     : "";
 
+  const selfAcct = `@agents:${agent.id}:available`;
   const system = [
     `You are ${agent.name}, the ${agent.role}. ${agent.tagline}`,
     ``,
     hustleLine,
     `Rules:`,
-    `- You may only invoke one of the provided tools — one of the 13 Numscript templates, or "idle".`,
+    `- You may only invoke one of the provided tools — one of the 13 Numscript templates, "post_offer", or "idle".`,
     `- Every action is public and auditable.`,
     `- Money cannot be created; only earned, traded, or loaned.`,
-    `- If no reasonable action is available, call the "idle" tool.`,
-    `- Keep reasoning concise — max 280 characters in the tool's reasoning field if present.`
+    `- Keep reasoning concise — max 280 characters in the tool's reasoning field if present.`,
+    ``,
+    `━━━ AUTHORIZATION — READ THIS CAREFULLY ━━━`,
+    `The cage lets you invoke a template ONLY if the money moves OUT of an account you own. Using someone else's account as the source is an automatic rejection (NotSelfOwned). Your account is: ${selfAcct}`,
+    ``,
+    `Templates YOU CAN initiate (with the param that must equal ${selfAcct}):`,
+    `  • p2p_transfer          — param: "from"`,
+    `  • gig_settlement        — param: "payer"      (you are paying the worker, not being paid)`,
+    `  • escrow_hold           — param: "payer"      (you are depositing into escrow)`,
+    `  • api_call_fee          — param: "caller"     (you are the one making the API call)`,
+    `  • subscription_charge   — param: "subscriber" (you are the subscriber — providers cannot pull)`,
+    `  • refund                — param: "merchant"   (you are the merchant refunding the customer)`,
+    `  • waterfall_pay         — params: "agent_credits" AND "agent_main" (both are you)`,
+    `  • credit_line_charge    — params: "agent_credit" AND "agent_main" (both are you)`,
+    `  • liquidate_wallet      — param: "from"`,
+    ``,
+    `Templates that ONLY specific roles can initiate (source is not an agent account):`,
+    `  • revenue_split         — Heidi (008), Pool-Keeper. Source: @platform:pool:liquidity-main or @platform:pool:yield`,
+    `  • dispute_arbitration   — Ivan (009), Disputant.  Source: an @escrow:job:{id}`,
+    `  • escrow_release        — Anyone, but source must be an existing @escrow:job:{id}`,
+    `  • escrow_refund         — Anyone, but source must be an existing @escrow:job:{id}`,
+    ``,
+    `If you are NOT Heidi, do not attempt revenue_split. If you are NOT Ivan, do not attempt dispute_arbitration. If you want to be PAID for a job, you cannot self-settle — you must post_offer to advertise and wait for the payer to invoke gig_settlement.`,
+    ``,
+    `━━━ HOW TO CHOOSE YOUR ACTION ━━━`,
+    `1. READ THE BOARD FIRST. If someone has posted an offer you can plausibly fulfill AS THE PAYER or AS THE INITIATOR (not as the worker), CLOSE IT by invoking the matching template with the offer id inside \`memo\` (e.g. memo: "settling off_xxx — delivering the writing"). This is the highest-signal thing you can do; the cage will wire it into an on-ledger audit trail.`,
+    `2. If no open offer matches but you have a clear earning/trading opportunity with another agent, CALL THE TEMPLATE DIRECTLY using ${selfAcct} as the source param listed above.`,
+    `3. Only if (1) and (2) don't apply, consider \`post_offer\` to advertise a service or request. DO NOT repeat an offer you already made this session — one post is enough to reach the whole city.`,
+    `4. If genuinely nothing sensible to do, call \`idle\`.`,
+    ``,
+    `post_offer is a conversation starter, not a deal. A healthy city is 20-30% post_offer and 40-60% template calls — if everyone is just posting, nothing is actually happening on the ledger.`
   ].filter(Boolean).join("\n");
 
   const now = input.nowMs ?? Date.now();
