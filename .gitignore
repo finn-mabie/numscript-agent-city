@@ -8,3 +8,6 @@ dist/
 .claude/
 .superpowers/
 packages/template-engine/test/__fixtures__/
+apps/web/.next/
+**/tsconfig.tsbuildinfo
+**/next-env.d.ts
