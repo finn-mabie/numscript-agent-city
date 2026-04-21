@@ -11,6 +11,8 @@
     "city:start": "pnpm --filter @nac/orchestrator run-city",
     "city:watch": "pnpm --filter @nac/orchestrator watch-events",
     "city:tick": "pnpm --filter @nac/orchestrator run-agent-once",
+    "web:dev": "pnpm --filter @nac/web dev",
+    "web:build": "pnpm --filter @nac/web build",
     "seed-genesis": "tsx scripts/seed-genesis.ts",
     "validate-templates": "tsx scripts/validate-templates.ts",
     "ledger:up": "docker compose up -d && ./scripts/wait-for-ledger.sh",
