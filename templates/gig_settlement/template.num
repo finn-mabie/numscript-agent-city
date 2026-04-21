@@ -1,0 +1,24 @@
+vars {
+  monetary $amount
+  account  $payer
+  account  $winner
+  account  $platform
+  portion  $platform_fee
+  account  $reviewer
+  portion  $reviewer_fee
+  string   $job_ref
+}
+
+send $amount (
+  source      = $payer
+  destination = {
+    $platform_fee to $platform
+    $reviewer_fee to $reviewer
+    remaining     to $winner
+  }
+)
+
+set_tx_meta("type",    "GIG_SETTLEMENT")
+set_tx_meta("job_ref", $job_ref)
+set_tx_meta("payer",   $payer)
+set_tx_meta("winner",  $winner)

@@ -1,0 +1,10 @@
+{
+  "amount":       { "asset": "USD/2", "amount": 100 },
+  "payer":        "@agents:003:available",
+  "winner":       "@agents:002:available",
+  "platform":     "@platform:revenue:fees",
+  "platform_fee": "5%",
+  "reviewer":     "@agents:004:available",
+  "reviewer_fee": "5%",
+  "job_ref":      "gig-001"
+}

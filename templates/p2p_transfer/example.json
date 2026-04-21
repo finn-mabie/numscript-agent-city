@@ -1,0 +1,6 @@
+{
+  "amount": { "asset": "USD/2", "amount": 250 },
+  "from":   "@agents:001:available",
+  "to":     "@agents:002:available",
+  "memo":   "lunch reimbursement"
+}

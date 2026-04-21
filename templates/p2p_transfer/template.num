@@ -1,0 +1,14 @@
+vars {
+  monetary $amount
+  account  $from
+  account  $to
+  string   $memo
+}
+
+send $amount (
+  source      = $from
+  destination = $to
+)
+
+set_tx_meta("type", "P2P_TRANSFER")
+set_tx_meta("memo", $memo)
