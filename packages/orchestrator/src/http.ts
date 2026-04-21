@@ -41,9 +41,19 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
+const MAX_BODY_BYTES = 8192;
+
 async function readJson(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let total = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    total += buf.length;
+    if (total > MAX_BODY_BYTES) {
+      throw Object.assign(new Error("body too large"), { code: "BODY_TOO_LARGE" });
+    }
+    chunks.push(buf);
+  }
   const text = Buffer.concat(chunks).toString("utf8");
   if (!text) return {};
   try { return JSON.parse(text); } catch { throw new Error("invalid JSON"); }
@@ -77,12 +87,15 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       }
       let body: any;
       try { body = await readJson(req); }
-      catch { return json(res, 400, { error: "invalid JSON" }); }
+      catch (e) {
+        const err = e as Error & { code?: string };
+        if (err.code === "BODY_TOO_LARGE") return json(res, 413, { error: "body too large" });
+        return json(res, 400, { error: "invalid JSON" });
+      }
       const targetAgentId = typeof body?.targetAgentId === "string" ? body.targetAgentId : null;
       const prompt = typeof body?.prompt === "string" ? body.prompt : null;
       if (!targetAgentId || !prompt) return json(res, 400, { error: "targetAgentId and prompt required" });
       if (prompt.length > 2000) return json(res, 413, { error: "prompt > 2000 chars" });
-      if (!ag.get(targetAgentId)) return json(res, 404, { error: `unknown agent ${targetAgentId}` });
 
       const ip = clientIp(req);
       const ipH = hashIp(ip, opts.arenaSalt);
@@ -97,6 +110,8 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
           return res.end(JSON.stringify({ error: "rate limited", retryAfterMs: r.retryAfterMs }));
         }
       }
+
+      if (!ag.get(targetAgentId)) return json(res, 404, { error: `unknown agent ${targetAgentId}` });
 
       const attackId = newAttackId();
       const submittedAt = Date.now();
