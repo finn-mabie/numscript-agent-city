@@ -1,0 +1,210 @@
+<style>
+  .village {
+    background: #1a2f1a;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 16px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 16px);
+    border-radius: 8px;
+    position: relative;
+    height: 260px;
+    overflow: hidden;
+    font-family: monospace;
+    image-rendering: pixelated;
+  }
+  .agent {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .building {
+    position: absolute;
+    background: #3a2418;
+    border-top: 6px solid #5a3a28;
+    border-radius: 2px;
+  }
+  .coin {
+    position: absolute;
+    width: 8px; height: 8px;
+    background: #f5c542;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #f5c542;
+  }
+  .feed {
+    background: #0a0a0a;
+    border-left: 1px solid #2a2a2a;
+    padding: 8px 10px;
+    font-family: monospace;
+    font-size: 10px;
+    color: #9e9e9e;
+    line-height: 1.6;
+  }
+  .feed .ok { color: #5dd3a0; }
+  .feed .rej { color: #f06464; }
+  .feed .amt { color: #f5c542; }
+  .arc {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: #f5c542;
+    border-radius: 50%;
+    box-shadow:
+      0 0 4px 1px #f5c542,
+      -8px -4px 0 0 #f5c542aa,
+      -16px -6px 0 0 #f5c54288,
+      -24px -4px 0 0 #f5c54266,
+      -32px 0 0 0 #f5c54244;
+  }
+  .badge {
+    position: absolute;
+    background: #f5c542;
+    color: #111;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+  .split .mockup { padding: 0; background: #111; border: 1px solid #2a2a2a; }
+  .split .mockup-body { padding: 0; }
+  .mockup-header { font-size: 11px; padding: 8px 12px; border-bottom: 1px solid #2a2a2a; }
+  .cap { font-size: 11px; color: #9e9e9e; margin-top: 6px; }
+  .tag { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: #2a2a2a; color: #ccc; margin-right: 4px; }
+</style>
+
+<h2>The City — aesthetic direction</h2>
+<p class="subtitle">You said pixel-village Smallville style. Three flavors of that. Click to pick one, or mix-and-match in the terminal.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Pure Cinematic Village</h3>
+      <div class="mockup">
+        <div class="mockup-body">
+          <div class="village">
+            <div class="building" style="left:40px;  top:30px;  width:60px; height:50px;"></div>
+            <div class="building" style="left:160px; top:50px;  width:80px; height:60px;"></div>
+            <div class="building" style="left:300px; top:30px;  width:50px; height:55px;"></div>
+            <div class="building" style="left:420px; top:60px;  width:70px; height:50px;"></div>
+            <div class="building" style="left:80px;  top:160px; width:70px; height:55px;"></div>
+            <div class="building" style="left:240px; top:170px; width:60px; height:50px;"></div>
+            <div class="building" style="left:380px; top:180px; width:80px; height:50px;"></div>
+
+            <div class="agent" style="left:70px;  top:110px; background:#6fa8dc;"></div>
+            <div class="agent" style="left:130px; top:130px; background:#e06666;"></div>
+            <div class="agent" style="left:210px; top:120px; background:#93c47d;"></div>
+            <div class="agent" style="left:280px; top:140px; background:#f6b26b;"></div>
+            <div class="agent" style="left:340px; top:110px; background:#c27ba0;"></div>
+            <div class="agent" style="left:410px; top:130px; background:#8e7cc3;"></div>
+            <div class="agent" style="left:100px; top:220px; background:#76a5af;"></div>
+            <div class="agent" style="left:260px; top:230px; background:#ffd966;"></div>
+            <div class="agent" style="left:360px; top:240px; background:#e69138;"></div>
+            <div class="agent" style="left:450px; top:220px; background:#38761d;"></div>
+
+            <div class="arc" style="left:230px; top:130px;"></div>
+            <div class="arc" style="left:300px; top:145px;"></div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Fullscreen map, no chrome. Agents as colored tiles, buildings as pixel structures. Money appears as trailing coins arcing between agents. Like Smallville / AI Town — pure atmosphere.</p>
+      <span class="tag">most cinematic</span><span class="tag">most viral-clip friendly</span><span class="tag">least info-dense</span>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Village + Live Ledger Feed</h3>
+      <div class="mockup">
+        <div class="mockup-body">
+          <div style="display:grid; grid-template-columns: 2fr 1fr; height:260px;">
+            <div class="village" style="border-radius: 8px 0 0 8px; height:260px;">
+              <div class="building" style="left:40px;  top:30px;  width:60px; height:50px;"></div>
+              <div class="building" style="left:160px; top:50px;  width:80px; height:60px;"></div>
+              <div class="building" style="left:300px; top:30px;  width:50px; height:55px;"></div>
+              <div class="building" style="left:80px;  top:170px; width:70px; height:55px;"></div>
+              <div class="building" style="left:240px; top:180px; width:60px; height:50px;"></div>
+
+              <div class="agent" style="left:70px;  top:110px; background:#6fa8dc;"></div>
+              <div class="agent" style="left:130px; top:130px; background:#e06666;"></div>
+              <div class="agent" style="left:210px; top:120px; background:#93c47d;"></div>
+              <div class="agent" style="left:280px; top:140px; background:#f6b26b;"></div>
+              <div class="agent" style="left:340px; top:110px; background:#c27ba0;"></div>
+              <div class="agent" style="left:100px; top:220px; background:#76a5af;"></div>
+              <div class="agent" style="left:260px; top:230px; background:#ffd966;"></div>
+              <div class="agent" style="left:340px; top:220px; background:#38761d;"></div>
+            </div>
+            <div class="feed">
+              <div>15:42:03</div>
+              <div><span class="ok">✓ GIG_SETTLEMENT</span></div>
+              <div>alice → bob <span class="amt">$0.90</span></div>
+              <div>+<span class="amt">$0.05</span> fees</div>
+              <div>&nbsp;</div>
+              <div>15:42:07</div>
+              <div><span class="ok">✓ API_CALL_FEE</span></div>
+              <div>carol → dave <span class="amt">$0.02</span></div>
+              <div>&nbsp;</div>
+              <div>15:42:11</div>
+              <div><span class="rej">✗ OVERDRAFT</span></div>
+              <div>attacker →</div>
+              <div>rejected</div>
+              <div>&nbsp;</div>
+              <div>15:42:14</div>
+              <div><span class="ok">✓ ESCROW_HOLD</span></div>
+              <div>eve → job:42</div>
+              <div><span class="amt">$1.00</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Pixel village on the left, scrolling real-time ledger feed on the right. Every transaction scrolls past color-coded. Click any line → jumps to that tx's Numscript + postings.</p>
+      <span class="tag">best educational</span><span class="tag">most dev-friendly</span><span class="tag">dense, less cinematic</span>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Village with Floating Amounts</h3>
+      <div class="mockup">
+        <div class="mockup-body">
+          <div class="village">
+            <div class="building" style="left:40px;  top:30px;  width:60px; height:50px;"></div>
+            <div class="building" style="left:160px; top:50px;  width:80px; height:60px;"></div>
+            <div class="building" style="left:300px; top:30px;  width:50px; height:55px;"></div>
+            <div class="building" style="left:420px; top:60px;  width:70px; height:50px;"></div>
+            <div class="building" style="left:80px;  top:160px; width:70px; height:55px;"></div>
+            <div class="building" style="left:240px; top:170px; width:60px; height:50px;"></div>
+            <div class="building" style="left:380px; top:180px; width:80px; height:50px;"></div>
+
+            <div class="agent" style="left:70px;  top:110px; background:#6fa8dc;"></div>
+            <div class="agent" style="left:130px; top:130px; background:#e06666;"></div>
+            <div class="agent" style="left:210px; top:120px; background:#93c47d;"></div>
+            <div class="agent" style="left:280px; top:140px; background:#f6b26b;"></div>
+            <div class="agent" style="left:340px; top:110px; background:#c27ba0;"></div>
+            <div class="agent" style="left:410px; top:130px; background:#8e7cc3;"></div>
+            <div class="agent" style="left:100px; top:220px; background:#76a5af;"></div>
+            <div class="agent" style="left:260px; top:230px; background:#ffd966;"></div>
+            <div class="agent" style="left:360px; top:240px; background:#e69138;"></div>
+            <div class="agent" style="left:450px; top:220px; background:#38761d;"></div>
+
+            <div class="badge" style="left:85px;  top:90px;">+$0.90</div>
+            <div class="badge" style="left:225px; top:100px;">+$0.05</div>
+            <div class="badge" style="left:355px; top:90px; background:#f06464; color:#fff;">✗ REJECTED</div>
+            <div class="badge" style="left:275px; top:210px;">+$1.00 escrow</div>
+
+            <div class="arc" style="left:230px; top:130px;"></div>
+            <div class="arc" style="left:300px; top:145px;"></div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Like A, but with ephemeral popups above agents — green dollar amounts for success, red REJECTED flashes for failures. No side panel. Info without clutter.</p>
+      <span class="tag">balanced</span><span class="tag">cinematic + informative</span><span class="tag">my recommendation</span>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:24px; font-size:11px; color:#666;">Color palette and building density are placeholder — this is about layout/info-density, not final polish. Real v1 would use proper pixel-art sprites and tile-based movement (Phaser or pixi.js).</p>
