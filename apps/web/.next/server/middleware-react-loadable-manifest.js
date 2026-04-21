@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}";
+self.__REACT_LOADABLE_MANIFEST="{\"app/page.tsx -> ../components/CityStage\":{\"id\":\"app/page.tsx -> ../components/CityStage\",\"files\":[\"static/chunks/_app-pages-browser_src_components_CityStage_tsx.js\"]}}"

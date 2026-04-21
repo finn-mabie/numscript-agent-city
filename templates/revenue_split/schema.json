@@ -4,11 +4,11 @@
   "params": {
     "total":       { "type": "monetary", "asset": "USD/2", "max": "100000_00", "min": "1" },
     "pool":        { "type": "account",  "pattern": "^@platform:pool:[a-zA-Z0-9-]+$" },
-    "recipient_a": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "recipient_a": { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "share_a":     { "type": "portion",  "max": "100%" },
-    "recipient_b": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "recipient_b": { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "share_b":     { "type": "portion",  "max": "100%" },
-    "recipient_c": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "recipient_c": { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "round_ref":   { "type": "string",   "maxLength": 64 }
   }
 }

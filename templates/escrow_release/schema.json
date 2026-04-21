@@ -3,7 +3,7 @@
   "description": "Release the full escrow balance to the winner. Wildcard send sweeps all USD/2.",
   "params": {
     "escrow":  { "type": "account", "pattern": "^@escrow:job:[a-zA-Z0-9-]+$" },
-    "winner":  { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "winner":  { "type": "account", "pattern": "^@agents:[0-9]{3}:available$" },
     "job_ref": { "type": "string",  "maxLength": 64 }
   }
 }

@@ -3,7 +3,7 @@
   "description": "Return full escrow balance to the original payer (dispute / cancellation path).",
   "params": {
     "escrow":  { "type": "account", "pattern": "^@escrow:job:[a-zA-Z0-9-]+$" },
-    "payer":   { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "payer":   { "type": "account", "pattern": "^@agents:[0-9]{3}:available$" },
     "job_ref": { "type": "string",  "maxLength": 64 }
   }
 }

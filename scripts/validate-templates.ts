@@ -27,7 +27,7 @@ function seedMetadata(vars: Record<string, string>): Record<string, Record<strin
   // For api_call_fee we need a unit_price on the provider.
   const md: Record<string, Record<string, string>> = {};
   for (const v of Object.values(vars)) {
-    if (/^agents:[0-9]+:available$/.test(v)) {
+    if (/^agents:[0-9]{3}:available$/.test(v)) {
       md[v] = { unit_price: "USD/2 2" };
     }
   }

@@ -41,10 +41,37 @@ export default function TxPanel() {
 
       <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Outcome</h3>
       <div className="text-paper">
+        {r.outcome === "pending"   && <span className="text-dim">⋯ pending (LLM picked tool; cage evaluating)</span>}
         {r.outcome === "committed" && <span className="text-[#6fa86a]">✓ committed</span>}
         {r.outcome === "rejected"  && <span className="text-scream">✗ {r.errorCode} <span className="text-dim">({r.errorPhase})</span></span>}
         {r.outcome === "idle"      && <span className="text-dim">idle</span>}
       </div>
+
+      {r.txId && (
+        <>
+          <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Audit</h3>
+          <LedgerLink txId={r.txId} />
+        </>
+      )}
     </aside>
+  );
+}
+
+function LedgerLink({ txId }: { txId: string }) {
+  const base = process.env.NEXT_PUBLIC_LEDGER_EXPLORER_URL; // e.g. https://<stack>.console.demo.dev.formance.cloud/ledger/city/transactions
+  const local = process.env.NEXT_PUBLIC_LEDGER_URL ?? "http://localhost:3068";
+  const ledger = process.env.NEXT_PUBLIC_LEDGER_NAME ?? "city";
+  const href = base
+    ? `${base.replace(/\/$/, "")}/${encodeURIComponent(txId)}`
+    : `${local}/v2/${ledger}/transactions/${encodeURIComponent(txId)}`;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-baseline gap-1.5 text-[11px] text-paper border-b border-dim hover:border-paper pb-[1px]"
+    >
+      view tx {txId} <span className="text-dim">↗</span>
+    </a>
   );
 }

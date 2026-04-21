@@ -26,7 +26,12 @@ describe("startHttp /snapshot", () => {
       outcome: "committed", errorPhase: null, errorCode: null, txId: "42", createdAt: 1
     });
 
-    const handle = await startHttp({ port: 0, db, getBalance: async () => 10000 });
+    const handle = await startHttp({
+      port: 0,
+      db,
+      getBalance: async () => 10000,
+      ledgerGet: async () => ({ ok: true, status: 200, body: { data: { volumes: { "USD/2": { balance: 10000 } }, metadata: {} } } })
+    });
     server = handle.server;
     baseUrl = `http://127.0.0.1:${handle.port}`;
   });

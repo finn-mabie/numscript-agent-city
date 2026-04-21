@@ -30,10 +30,13 @@ export class AgentSprite {
     }).setOrigin(0.5, 1).setResolution(3);
 
     this.sprite.setInteractive({ useHandCursor: true });
-    this.sprite.on("pointerover", () => {
-      // Scale by canvas zoom factor (4 — see boot.ts) so the HTML hover card
-      // positions correctly over the screen pixel of the sprite.
-      window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: { id: agent.id, x: this.px() * 4, y: this.py() * 4 } }));
+    this.sprite.on("pointerover", (pointer: Phaser.Input.Pointer) => {
+      // Use the raw DOM event's clientX/Y — gives exact screen coords
+      // regardless of canvas zoom / centering. HTML hover card lands correctly.
+      const ev = pointer.event as MouseEvent;
+      window.dispatchEvent(new CustomEvent("nac:agent-hover", {
+        detail: { id: agent.id, x: ev.clientX, y: ev.clientY }
+      }));
     });
     this.sprite.on("pointerout", () => {
       window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: null }));

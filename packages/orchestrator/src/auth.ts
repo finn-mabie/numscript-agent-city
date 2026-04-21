@@ -42,7 +42,7 @@ export type AuthorizationResult =
   | { ok: true }
   | { ok: false; paramName: string; got: string };
 
-const AGENT_ACCOUNT_RE = /^@agents:([0-9]+):.+$/;
+const AGENT_ACCOUNT_RE = /^@agents:([0-9]{3}):.+$/;
 
 /**
  * Verify every self-owned param in `params` refers to the acting agent.

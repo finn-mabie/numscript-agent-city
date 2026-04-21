@@ -3,8 +3,8 @@
   "description": "Idempotent refund keyed by the original tx reference.",
   "params": {
     "amount":          { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
-    "merchant":        { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
-    "customer":        { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "merchant":        { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
+    "customer":        { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "original_tx_ref": { "type": "string",   "maxLength": 64 }
   }
 }

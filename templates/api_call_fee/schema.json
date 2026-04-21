@@ -3,8 +3,8 @@
   "description": "Pay a provider for N calls. Caller reads the provider's unit_price metadata off-chain, computes total amount, and submits as a typed param.",
   "params": {
     "amount":   { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
-    "caller":   { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
-    "provider": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "caller":   { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
+    "provider": { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "units":    { "type": "number",   "minimum": 1, "maximum": 10000 },
     "call_ref": { "type": "string",   "maxLength": 64 }
   }

@@ -5,8 +5,8 @@
     "amount":       { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
     "agent_credit": { "type": "account",  "pattern": "^@agents:[0-9]+:credit$" },
     "credit_limit": { "type": "monetary", "asset": "USD/2", "max": "500_00", "min": "0" },
-    "agent_main":   { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
-    "to":           { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "agent_main":   { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
+    "to":           { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
     "memo":         { "type": "string",   "maxLength": 140 }
   }
 }

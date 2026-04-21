@@ -58,7 +58,8 @@ async function main() {
   const http = await startHttp({
     port: httpPort,
     db,
-    getBalance: (addr) => ledger.getBalance(addr, "USD/2")
+    getBalance: (addr) => ledger.getBalance(addr, "USD/2"),
+    ledgerGet: (path) => ledger.get(path)
   });
   console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot`);
 

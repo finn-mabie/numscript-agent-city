@@ -48,16 +48,20 @@ const RECENT_CAP = 200;
 // at y=1 (top row) and y=9 (bottom row); agent homes sit one tile below / above
 // the corresponding building. Freelance agents (Eve/Frank/Grace/Judy) anchor in
 // the middle row.
+// Anchored owners stand BESIDE their building (one tile offset so the agent
+// sprite doesn't occlude the artwork). Buildings are at ty=2 (top row) and
+// ty=10 (bottom row); owners sit at ty=4 and ty=8 respectively. Freelancers
+// live in the middle of the grid.
 const START_POSITIONS: Record<string, [number, number]> = {
-  "001": [ 2, 2],   // Alice — Market         (anchored)
-  "002": [12, 2],   // Bob — Post Office      (anchored)
-  "003": [17, 2],   // Carol — Inspector      (anchored)
-  "004": [ 7, 2],   // Dave — Bank            (anchored)
+  "001": [ 2, 4],   // Alice — Market         (below Market)
+  "002": [12, 4],   // Bob — Post Office      (below Post Office)
+  "003": [17, 4],   // Carol — Inspector      (below Inspector)
+  "004": [ 7, 4],   // Dave — Bank            (below Bank)
   "005": [ 4, 6],   // Eve — freelance (research)
   "006": [ 9, 6],   // Frank — freelance (writing)
   "007": [14, 6],   // Grace — freelance (illustration)
-  "008": [ 5, 10],  // Heidi — Pool           (anchored)
-  "009": [14, 10],  // Ivan — Escrow          (anchored)
+  "008": [ 5, 8],   // Heidi — Pool           (above Pool)
+  "009": [14, 8],   // Ivan — Escrow          (above Escrow Vault)
   "010": [18, 6]    // Judy — Red Agent probe zone
 };
 

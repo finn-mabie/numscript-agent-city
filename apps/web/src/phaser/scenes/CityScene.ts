@@ -132,7 +132,7 @@ export class CityScene extends Phaser.Scene {
     if (!params) return null;
     for (const v of Object.values(params)) {
       if (typeof v === "string") {
-        const m = v.match(/^@agents:([0-9]+):.+$/);
+        const m = v.match(/^@agents:([0-9]{3}):.+$/);
         if (m && m[1]) return m[1];
       }
     }
@@ -151,33 +151,183 @@ export class CityScene extends Phaser.Scene {
   }
 
   private buildBuildings(): void {
-    // Six building landmarks rendered as design-system rectangles (mute fill,
-    // paper 1px border). Matches the "financial data-room meets pixel village"
-    // direction — buildings read as intentional plates instead of random
-    // tileset tiles. Spaced across a 20x12 grid so labels don't collide.
-    const defs: Array<{ tx: number; ty: number; label: string }> = [
-      { tx:  2, ty:  1, label: "Market" },
-      { tx:  7, ty:  1, label: "Bank" },
-      { tx: 12, ty:  1, label: "Post Office" },
-      { tx: 17, ty:  1, label: "Inspector" },
-      { tx:  5, ty:  9, label: "Pool" },
-      { tx: 14, ty:  9, label: "Escrow" }
+    // Six building landmarks. Each one has its OWN archetype drawn from
+    // primitives — a market stall, a columned bank, a post-office box, an
+    // inspector's kiosk, an actual pool of water, and a vault block.
+    const defs: Array<{ tx: number; ty: number; label: string; draw: (scene: Phaser.Scene, cx: number, cy: number) => void }> = [
+      { tx:  2, ty:  2, label: "Market",      draw: drawMarket      },
+      { tx:  7, ty:  2, label: "Bank",        draw: drawBank        },
+      { tx: 12, ty:  2, label: "Post Office", draw: drawPostOffice  },
+      { tx: 17, ty:  2, label: "Inspector",   draw: drawInspector   },
+      { tx:  5, ty: 10, label: "Pool",        draw: drawPool        },
+      { tx: 14, ty: 10, label: "Escrow",      draw: drawEscrow      }
     ];
-    const W = TILE * 2.5;
-    const H = TILE * 1.6;
+
     for (const d of defs) {
       const cx = d.tx * TILE + TILE;
-      const cy = d.ty * TILE + TILE;
-      this.add.rectangle(cx, cy, W, H, 0x3a3732)   // --mute
-        .setStrokeStyle(1, 0xede8df);              // --paper
-      // Small pixel window for texture
-      this.add.rectangle(cx, cy - 1, W * 0.5, 2, 0x6e6a62); // --dim
-      this.add.text(cx, cy - H / 2 - 2, d.label, {
+      const cy = d.ty * TILE + TILE * 0.6;  // building center pulled UP a bit so label fits above
+      d.draw(this, cx, cy);
+      this.add.text(cx, cy - TILE * 1.6, d.label, {
         fontFamily: "ui-monospace, monospace",
         fontSize: "10px",
         color: "#ede8df",
-        fontStyle: "500"
+        fontStyle: "600"
       }).setOrigin(0.5, 1).setResolution(3);
     }
+  }
+}
+
+// ── Per-building artwork ───────────────────────────────────────────────────
+// All buildings draw within a ~40×36 footprint centered at (cx, cy).
+// Design direction: each has a distinctive silhouette matching its purpose,
+// warm neutrals only, no saturated primaries, crisp 1px outlines.
+
+const OUTLINE = 0xede8df;
+
+/** MARKET — open-air stall with striped awning, counter, and crates. */
+function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 40, stallH = 14, postH = 10;
+  // Striped awning (trapezoid-like: 3 colored bands stacked)
+  const stripes = [0xc69361, 0x9a6b47, 0xc69361];
+  for (let i = 0; i < stripes.length; i++) {
+    s.add.rectangle(cx, cy - 12 + i * 3, W, 3, stripes[i]).setStrokeStyle(1, OUTLINE);
+  }
+  // Awning top edge (slight crown)
+  s.add.triangle(cx, cy - 14, -W/2 + 2, 0, 0, -4, W/2 - 2, 0, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  // Counter (horizontal slab)
+  s.add.rectangle(cx, cy + 6, W - 4, 4, 0x7a5c42).setStrokeStyle(1, OUTLINE);
+  // 2 support posts
+  s.add.rectangle(cx - W/2 + 3, cy - 2, 2, postH, 0x4f3c2b);
+  s.add.rectangle(cx + W/2 - 3, cy - 2, 2, postH, 0x4f3c2b);
+  // Crates on the counter
+  s.add.rectangle(cx - 8, cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx,      cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx + 8, cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+}
+
+/** BANK — greek temple: pediment triangle, columns, vault door. */
+function drawBank(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 34, bodyH = 18;
+  // Pediment (top triangle)
+  s.add.triangle(cx, cy - bodyH/2 - 1, -W/2 - 2, 0, 0, -9, W/2 + 2, 0, 0xbfa25d).setStrokeStyle(1, OUTLINE);
+  // Entablature (thin horizontal band below pediment)
+  s.add.rectangle(cx, cy - bodyH/2 + 1, W + 4, 2, 0x544529).setStrokeStyle(1, OUTLINE);
+  // Base platform (step below body)
+  s.add.rectangle(cx, cy + bodyH/2 + 1, W + 6, 3, 0x544529).setStrokeStyle(1, OUTLINE);
+  // Three columns (between base and entablature)
+  const colY = cy + 1;
+  for (const dx of [-W * 0.35, 0, W * 0.35]) {
+    s.add.rectangle(cx + dx, colY, 3, bodyH - 2, 0xd4b76f).setStrokeStyle(1, OUTLINE);
+  }
+  // Vault door in the center (dark circle behind columns)
+  s.add.circle(cx, colY + 1, 4, 0x1f1a16).setStrokeStyle(1, OUTLINE);
+  // Dollar sign on the pediment (tiny "$" made from a rect + arcs is hard; use text)
+  s.add.text(cx, cy - bodyH/2 - 3, "$", {
+    fontFamily: "ui-monospace, monospace",
+    fontSize: "8px",
+    color: "#5a3a22",
+    fontStyle: "700"
+  }).setOrigin(0.5, 0.5).setResolution(3);
+}
+
+/** POST OFFICE — utility building with a mailbox slot, door, and sign. */
+function drawPostOffice(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 36, bodyH = 22;
+  // Body (slate)
+  s.add.rectangle(cx, cy, W, bodyH, 0x566874).setStrokeStyle(1, OUTLINE);
+  // Flat roof trim
+  s.add.rectangle(cx, cy - bodyH/2 - 1, W + 2, 2, 0x2d3942);
+  // Sign board above the door
+  s.add.rectangle(cx, cy - bodyH/2 + 4, W * 0.55, 4, 0x2d3942).setStrokeStyle(1, OUTLINE);
+  s.add.text(cx, cy - bodyH/2 + 4, "POST", {
+    fontFamily: "ui-monospace, monospace",
+    fontSize: "5px",
+    color: "#ede8df",
+    fontStyle: "700"
+  }).setOrigin(0.5, 0.5).setResolution(3);
+  // Mail slot (horizontal dark rectangle on the door)
+  s.add.rectangle(cx - W * 0.22, cy, 7, 2, 0x1a1a1a);
+  // Envelope icon on the door
+  s.add.rectangle(cx + W * 0.2, cy, 8, 6, 0xede8df).setStrokeStyle(1, 0x2d3942);
+  s.add.triangle(cx + W * 0.2, cy - 1, -4, -2, 0, 1, 4, -2, 0xc0bdb4);
+  // Door
+  s.add.rectangle(cx - W * 0.08, cy + bodyH * 0.25, 5, bodyH * 0.4, 0x1f1a16).setStrokeStyle(1, 0x7b8d9a);
+}
+
+/** INSPECTOR — small kiosk with a magnifying glass symbol and counter window. */
+function drawInspector(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 34, bodyH = 22;
+  // Body (olive)
+  s.add.rectangle(cx, cy, W, bodyH, 0x64714e).setStrokeStyle(1, OUTLINE);
+  // Sloped roof (one side higher — gives a kiosk/booth feel)
+  s.add.triangle(
+    cx, cy - bodyH/2,
+    -W/2 - 1, 0,
+    -W/2 + 4, -8,
+    W/2 + 1, 0,
+    0x37412a
+  ).setStrokeStyle(1, OUTLINE);
+  // Counter window (wide, glazed)
+  s.add.rectangle(cx, cy - 2, W - 8, 7, 0xc9ceb7).setStrokeStyle(1, 0x3a4128);
+  // Counter shelf below window
+  s.add.rectangle(cx, cy + 3, W - 6, 2, 0x3a4128);
+  // Magnifying glass icon (circle + handle line) on the side
+  const mgX = cx + W * 0.3;
+  const mgY = cy + bodyH * 0.22;
+  s.add.circle(mgX, mgY, 3, 0x3a4128).setStrokeStyle(1, 0xede8df);
+  s.add.circle(mgX, mgY, 2, 0xc9ceb7);
+  // Handle
+  s.add.rectangle(mgX + 3, mgY + 3, 4, 1.2, 0x3a4128);
+  // Clipboard icon on the other side
+  s.add.rectangle(cx - W * 0.32, cy + bodyH * 0.22, 5, 6, 0xede8df).setStrokeStyle(1, 0x3a4128);
+  s.add.rectangle(cx - W * 0.32, cy + bodyH * 0.22 - 2.5, 2.5, 1, 0x3a4128);
+}
+
+/** POOL — actual pool of water with a deck border and ripples. */
+function drawPool(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 42, H = 24;
+  // Deck border (outer)
+  s.add.rectangle(cx, cy, W, H, 0x9a8f7a).setStrokeStyle(1, OUTLINE);
+  // Water (inner)
+  const wInner = W - 10, hInner = H - 8;
+  s.add.rectangle(cx, cy, wInner, hInner, 0x4e9ba0).setStrokeStyle(1, 0x2a3c3e);
+  // Darker inner shadow (gives depth)
+  s.add.rectangle(cx, cy - 2, wInner - 4, 2, 0x2a6d72);
+  // Ripples (wavy lines — use short rects offset to simulate)
+  for (let i = 0; i < 3; i++) {
+    const y = cy - hInner / 2 + 6 + i * 4;
+    for (let x = -wInner / 2 + 4; x <= wInner / 2 - 4; x += 5) {
+      s.add.rectangle(cx + x, y, 2, 1, 0x9ad2d6);
+      s.add.rectangle(cx + x + 2.5, y + 1, 2, 1, 0x9ad2d6);
+    }
+  }
+  // Diving board stub on one side
+  s.add.rectangle(cx - W / 2 - 2, cy - H / 4, 5, 2, 0xc0b8a5).setStrokeStyle(1, OUTLINE);
+}
+
+/** ESCROW VAULT — monolithic block with a circular vault door and bolts. */
+function drawEscrow(s: Phaser.Scene, cx: number, cy: number): void {
+  const W = 38, H = 28;
+  // Outer block (thick wall shade)
+  s.add.rectangle(cx, cy, W, H, 0x4a3c54).setStrokeStyle(1, OUTLINE);
+  // Inner chamber (slightly lighter)
+  s.add.rectangle(cx, cy, W - 6, H - 6, 0x665272).setStrokeStyle(1, 0x362b3c);
+  // Vault door — large central circle
+  const r = 8;
+  s.add.circle(cx, cy, r, 0x362b3c).setStrokeStyle(1, OUTLINE);
+  s.add.circle(cx, cy, r - 2, 0x8a7599);
+  // Center handle (small cross / plus)
+  s.add.rectangle(cx, cy, 2, 6, 0x362b3c);
+  s.add.rectangle(cx, cy, 6, 2, 0x362b3c);
+  // 8 bolts around the door (octagonal pattern)
+  for (let i = 0; i < 8; i++) {
+    const th = (i / 8) * Math.PI * 2;
+    const bx = cx + Math.cos(th) * (r + 2);
+    const by = cy + Math.sin(th) * (r + 2);
+    s.add.circle(bx, by, 1, 0xede8df);
+  }
+  // Corner rivets (structural cue)
+  for (const [dx, dy] of [[-W/2+2, -H/2+2], [W/2-2, -H/2+2], [-W/2+2, H/2-2], [W/2-2, H/2-2]]) {
+    s.add.circle(cx + dx, cy + dy, 1, 0xede8df);
   }
 }

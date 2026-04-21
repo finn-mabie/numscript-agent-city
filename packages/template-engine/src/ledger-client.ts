@@ -98,6 +98,18 @@ export class LedgerClient {
   }
 
   /**
+   * Generic GET against this ledger's API. `path` is appended after
+   * `/v2/{ledger}` so callers pass e.g. `/accounts/agents:001:available`.
+   * Used by the orchestrator's HTTP `/agent/:id` proxy endpoint.
+   */
+  async get(path: string): Promise<{ ok: boolean; status: number; body: unknown }> {
+    const url = `${this.baseUrl}/v2/${this.ledger}${path.startsWith("/") ? path : "/" + path}`;
+    const res = await fetch(url, { headers: await this.headers() });
+    const body = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, body };
+  }
+
+  /**
    * Returns the current balance of `account` for `asset` in minor units (integer).
    * Returns 0 if the account has never received a posting in this asset.
    * Returns null on HTTP error (so the caller can distinguish "unknown" from "zero").
