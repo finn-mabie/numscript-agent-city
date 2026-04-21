@@ -58,8 +58,15 @@ async function main() {
 
   const arenaQueue = createArenaQueue();
   const arena = arenaRepo(db);
-  const arenaSalt = process.env.ARENA_SALT ?? randomBytes(24).toString("hex");
-  console.error(`[city] arena salt ${process.env.ARENA_SALT ? "env-provided" : "ephemeral (restart will invalidate ip_hash correlations)"}`);
+  const envSalt = process.env.ARENA_SALT;
+  const saltIsValid = typeof envSalt === "string" && envSalt.length >= 16;
+  const arenaSalt = saltIsValid ? envSalt! : randomBytes(24).toString("hex");
+  const saltSource = saltIsValid
+    ? "env-provided"
+    : envSalt !== undefined && envSalt.length > 0
+      ? "ephemeral (ARENA_SALT env var < 16 chars — ignored)"
+      : "ephemeral (restart will invalidate ip_hash correlations)";
+  console.error(`[city] arena salt ${saltSource}`);
 
   const httpPort = Number(process.env.CITY_HTTP_PORT ?? 3071);
   const http = await startHttp({

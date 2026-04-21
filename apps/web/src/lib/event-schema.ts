@@ -22,7 +22,7 @@ export type CityEvent =
   | (Base & { kind: "arena-submit";        data: { attackId: string; targetAgentId: AgentId; promptPreview: string; submittedAt: number } })
   | (Base & { kind: "arena-resolved";      data: { attackId: string; outcome: "committed" | "rejected" | "idle"; phase: RejectionPhase | null; code: string | null; tickId: string } });
 
-export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler";
+export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler" | "exception";
 
 // Narrowing helper for switch-exhaustiveness in consumers.
 export function matchEvent<T>(e: CityEvent, handlers: {
