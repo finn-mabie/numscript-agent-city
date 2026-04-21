@@ -5,6 +5,10 @@ import { fetchSnapshot } from "../lib/snapshot";
 import { connectEventStream } from "../lib/event-stream";
 import { useCityStore } from "../state/city-store";
 import type Phaser from "phaser";
+import HudTopBar from "./HudTopBar";
+import AgentCard from "./AgentCard";
+import AgentPanel from "./AgentPanel";
+import TxPanel from "./TxPanel";
 
 type ConnStatus = "connecting" | "live" | "quiet" | "error";
 
@@ -47,6 +51,10 @@ export default function CityStage() {
   return (
     <div className="relative min-h-screen bg-ink">
       <div ref={parentRef} className="flex min-h-screen items-center justify-center" />
+      <HudTopBar />
+      <AgentCard />
+      <AgentPanel />
+      <TxPanel />
       {status === "connecting" && (
         <Overlay>Connecting to the city…</Overlay>
       )}
