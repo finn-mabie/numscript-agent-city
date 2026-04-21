@@ -1,7 +1,8 @@
+"use client";
+import dynamic from "next/dynamic";
+
+const CityStage = dynamic(() => import("../components/CityStage"), { ssr: false });
+
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center font-mono text-sm text-dim">
-      scaffolded — mount CityStage in Task 12
-    </main>
-  );
+  return <CityStage />;
 }
