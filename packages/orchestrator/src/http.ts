@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import { agentRepo, intentLogRepo } from "./repositories.js";
 import type { ArenaQueue } from "./arena.js";
 import type { arenaRepo } from "./repositories.js";
+import type { offerRepo as offerRepoFactory } from "./repositories.js";
 import { newAttackId, hashPrompt, hashIp, promptPreview } from "./arena.js";
 import { createRateLimiter, type RateLimiter } from "./rate-limit.js";
 
@@ -33,6 +34,7 @@ export interface StartHttpOptions {
   }) => void;
   /** Absolute path to the templates root. When set, /template/:id and /templates are exposed. */
   templatesRoot?: string;
+  offerRepo?: ReturnType<typeof offerRepoFactory>;
 }
 
 export interface HttpHandle {
@@ -268,6 +270,28 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       } catch (e) {
         return json(res, 500, { error: (e as Error).message });
       }
+    }
+
+    // ── /offers ──────────────────────────────────────────────────────────
+    if (path === "/offers") {
+      if (!opts.offerRepo) return json(res, 503, { error: "offers not configured" });
+      try {
+        return json(res, 200, { offers: opts.offerRepo.openOffers(20) });
+      } catch (e) {
+        return json(res, 500, { error: (e as Error).message });
+      }
+    }
+
+    // ── /offers/:id ──────────────────────────────────────────────────────
+    const offerMatch = path.match(/^\/offers\/(off_[a-z0-9_]+)$/);
+    if (offerMatch) {
+      if (!opts.offerRepo) return json(res, 503, { error: "offers not configured" });
+      const id = offerMatch[1];
+      const offer = opts.offerRepo.get(id);
+      if (!offer) return json(res, 404, { error: `offer ${id} not found` });
+      const rootId = offer.inReplyTo ?? offer.id;
+      const thread = opts.offerRepo.threadOf(rootId);
+      return json(res, 200, { offer, thread });
     }
 
     json(res, 404, { error: "not found" });
