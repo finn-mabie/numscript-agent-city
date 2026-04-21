@@ -37,6 +37,13 @@ export default function CityStage() {
         console.warn("snapshot unavailable", e);
         setStatus("error");
       }
+
+      // Fetch offers in parallel (non-fatal if it fails)
+      const ORCH_BASE = process.env.NEXT_PUBLIC_CITY_HTTP_URL ?? process.env.NEXT_PUBLIC_ORCH_HTTP ?? "http://127.0.0.1:3071";
+      fetch(`${ORCH_BASE}/offers`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((b) => useCityStore.getState().hydrateOffers(b.offers ?? []))
+        .catch(() => { /* non-fatal */ });
     })();
 
     const stream = connectEventStream((e) => {

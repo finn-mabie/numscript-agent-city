@@ -36,6 +36,19 @@ export interface ArenaActiveView {
   submittedAt: number;
 }
 
+export interface OfferView {
+  id: string;
+  authorAgentId: string;
+  text: string;
+  inReplyTo: string | null;
+  createdAt: number;
+  expiresAt: number;
+  status: "open" | "closed" | "expired";
+  closedByTx: string | null;
+  closedByAgent: string | null;
+  closedAt: number | null;
+}
+
 interface CityState {
   agents: Record<string, AgentView>;
   recent: IntentLogView[];      // newest first, capped
@@ -49,8 +62,12 @@ interface CityState {
   arenaRejected: number;                          // attacks the cage caught
   arenaActive: Record<string, ArenaActiveView>;   // keyed by targetAgentId — currently-incoming attacks
 
+  // Offers
+  offers: Record<string, OfferView>;
+
   hydrate: (args: { agents: AgentView[]; recent: IntentLogView[] }) => void;
   applyEvent: (e: CityEvent) => void;
+  hydrateOffers: (offers: OfferView[]) => void;
   noteArenaLocalSubmit: (args: { attackId: string; targetAgentId: string; promptPreview: string }) => void;
 }
 
@@ -95,6 +112,7 @@ export const useCityStore = create<CityState>((set) => ({
   arenaSubmitted: 0,
   arenaRejected: 0,
   arenaActive: {},
+  offers: {},
 
   hydrate({ agents, recent }) {
     const byId: Record<string, AgentView> = {};
@@ -103,6 +121,12 @@ export const useCityStore = create<CityState>((set) => ({
       byId[a.id] = { ...a, x, y };
     }
     set({ agents: byId, recent: recent.slice(0, RECENT_CAP) });
+  },
+
+  hydrateOffers(offers) {
+    const byId: Record<string, OfferView> = {};
+    for (const o of offers) byId[o.id] = o;
+    set({ offers: byId });
   },
 
   applyEvent(e) {
@@ -174,6 +198,42 @@ export const useCityStore = create<CityState>((set) => ({
           if (a.attackId === d.attackId) delete activeCopy[agentId];
         }
         next.arenaActive = activeCopy;
+      }
+
+      if (e.kind === "offer-posted") {
+        const d = (e as any).data;
+        next.offers = {
+          ...s.offers,
+          [d.offerId]: {
+            id: d.offerId,
+            authorAgentId: d.authorAgentId,
+            text: d.text,
+            inReplyTo: d.inReplyTo,
+            createdAt: e.at,
+            expiresAt: d.expiresAt,
+            status: "open",
+            closedByTx: null,
+            closedByAgent: null,
+            closedAt: null
+          }
+        };
+      }
+
+      if (e.kind === "offer-closed") {
+        const d = (e as any).data;
+        const existing = s.offers[d.offerId];
+        if (existing) {
+          next.offers = {
+            ...s.offers,
+            [d.offerId]: {
+              ...existing,
+              status: "closed",
+              closedByTx: d.closedByTx,
+              closedByAgent: d.closedByAgent,
+              closedAt: d.closedAt
+            }
+          };
+        }
       }
 
       return next;
