@@ -57,6 +57,15 @@ export function validateParams(
         }
         break;
       }
+      case "account_list": {
+        if (typeof v !== "string") {
+          return { ok: false, error: err("TypeMismatch", `${name} must be string (wildcard pattern)`) };
+        }
+        if (spec.pattern !== undefined && !new RegExp(spec.pattern).test(v)) {
+          return { ok: false, error: err("PatternMismatch", `${name} does not match pattern ${spec.pattern}`) };
+        }
+        break;
+      }
       case "portion": {
         if (typeof v !== "string") {
           return { ok: false, error: err("TypeMismatch", `${name} must be string portion like "5%" or "1/3"`) };

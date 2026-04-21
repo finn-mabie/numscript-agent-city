@@ -1,0 +1,1 @@
+send [USD/2 100] (source=@a destination=@b)

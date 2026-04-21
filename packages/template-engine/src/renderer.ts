@@ -24,6 +24,12 @@ export function renderVars(
         vars[name] = s.startsWith("@") ? s.slice(1) : s;
         break;
       }
+      case "account_list": {
+        // Numscript expects: accounts("agents:*:available")
+        const s = v as string;
+        vars[name] = `accounts("${s}")`;
+        break;
+      }
       case "portion":
       case "string":
         vars[name] = v as string;

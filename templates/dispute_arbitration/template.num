@@ -1,0 +1,21 @@
+vars {
+  monetary $funds
+  account  $source
+  account  $party_a
+  account  $party_b
+  portion  $a_portion
+  string   $dispute_ref
+}
+
+send $funds (
+  source      = $source
+  destination = {
+    $a_portion to $party_a
+    remaining  to $party_b
+  }
+)
+
+set_tx_meta("type",         "DISPUTE_ARBITRATION")
+set_tx_meta("dispute_ref",  $dispute_ref)
+set_tx_meta("party_a",      $party_a)
+set_tx_meta("party_b",      $party_b)

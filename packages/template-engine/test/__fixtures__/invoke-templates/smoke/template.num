@@ -1,0 +1,9 @@
+vars {
+  monetary $amount
+  account $to
+}
+send $amount (
+  source = @mint:genesis allowing unbounded overdraft
+  destination = $to
+)
+set_tx_meta("type", "SMOKE")

@@ -1,0 +1,9 @@
+{
+  "id": "revenue_split",
+  "description": "Distribute a pool's full USD/2 balance to N recipients proportionally to their current balances.",
+  "params": {
+    "pool":       { "type": "account", "pattern": "^@platform:pool:[a-zA-Z0-9-]+$" },
+    "recipients": { "type": "account_list",  "pattern": "^[a-zA-Z0-9:*]+$", "description": "Wildcard pattern like 'agents:*:available'" },
+    "round_ref":  { "type": "string",  "maxLength": 64 }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "funds":       { "asset": "USD/2", "amount": 800 },
+  "source":      "@escrow:job:gig-004",
+  "party_a":     "@agents:003:available",
+  "party_b":     "@agents:002:available",
+  "a_portion":   "60%",
+  "dispute_ref": "disp-001"
+}

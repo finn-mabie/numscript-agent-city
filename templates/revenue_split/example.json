@@ -1,0 +1,5 @@
+{
+  "pool":       "@platform:pool:yield",
+  "recipients": "agents:*:available",
+  "round_ref":  "yield:2026-04-21"
+}

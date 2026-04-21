@@ -1,0 +1,11 @@
+vars {
+  account      $pool
+  account_list $recipients
+  monetary     $total = balance($pool, USD/2)
+  string       $round_ref
+}
+
+distribute($total, $pool, $recipients, USD/2)
+
+set_tx_meta("type",      "REVENUE_SPLIT")
+set_tx_meta("round_ref", $round_ref)

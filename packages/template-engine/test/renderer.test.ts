@@ -31,4 +31,10 @@ describe("renderVars", () => {
       n: "42"
     });
   });
+
+  it("renders account_list as accounts(\"pattern\")", () => {
+    const s: TemplateSchema = { id: "t", description: "t", params: { list: { type: "account_list" } } };
+    const v = renderVars(s, { list: "agents:*:available" });
+    expect(v).toEqual({ list: 'accounts("agents:*:available")' });
+  });
 });
