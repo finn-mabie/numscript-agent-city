@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCityStore } from "../state/city-store";
+import { AGENT_TEMPLATES } from "../lib/agent-templates";
 
 const ORCH_BASE = process.env.NEXT_PUBLIC_CITY_HTTP_URL ?? "http://127.0.0.1:3071";
 
@@ -93,6 +94,27 @@ export default function AgentPanel() {
       </div>
 
       <p className="mt-4 text-paper text-[12px] leading-relaxed">{a.tagline}</p>
+
+      <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Templates this role uses</h3>
+      <div className="flex flex-wrap gap-1">
+        {(AGENT_TEMPLATES[a.id] ?? []).length === 0 ? (
+          <span className="text-[11px] text-dim italic">
+            {a.id === "010" ? "None — every call is rejected by design" : "No templates bound to this role yet"}
+          </span>
+        ) : (
+          (AGENT_TEMPLATES[a.id] ?? []).map((tid) => (
+            <button
+              key={tid}
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("nac:template-click", { detail: { templateId: tid } }))}
+              className="text-[10px] uppercase tracking-wider border border-mute px-2 py-0.5 hover:bg-mute transition-colors text-paper font-mono"
+              title={`View ${tid} Numscript source`}
+            >
+              {tid}
+            </button>
+          ))
+        )}
+      </div>
 
       {detail && Object.keys(detail.metadata).length > 0 && (
         <>
