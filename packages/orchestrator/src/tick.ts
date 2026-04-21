@@ -19,8 +19,11 @@ export interface TickDeps {
   now?: () => number;
 }
 
-const MIN_TICK_INTERVAL_MS = 7 * 60 * 1000;
-const MAX_TICK_INTERVAL_MS = 13 * 60 * 1000;
+// Tick intervals are env-configurable so demo/visual-testing can shorten
+// them without touching production defaults. Values are milliseconds.
+const DEMO = process.env.DEMO_MODE === "1";
+const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (DEMO ? 20_000 : 7 * 60 * 1000));
+const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (DEMO ? 40_000 : 13 * 60 * 1000));
 const LOW_BALANCE_TRACKER = new Map<string, number>();
 
 function nextTickAt(now: number): number {
