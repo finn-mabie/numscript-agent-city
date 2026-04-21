@@ -11,6 +11,7 @@ import AgentPanel from "./AgentPanel";
 import TxPanel from "./TxPanel";
 import ActivityTicker from "./ActivityTicker";
 import { ArenaBar } from "./ArenaBar";
+import BuildingPanel from "./BuildingPanel";
 
 type ConnStatus = "connecting" | "live" | "quiet" | "error";
 
@@ -57,6 +58,7 @@ export default function CityStage() {
       <AgentCard />
       <AgentPanel />
       <TxPanel />
+      <BuildingPanel />
       <ActivityTicker />
       <ArenaBar />
       {status === "connecting" && (

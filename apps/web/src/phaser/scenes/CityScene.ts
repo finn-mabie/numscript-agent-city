@@ -5,6 +5,7 @@ import { emitCoins } from "../coin-flow";
 import { floatPopup, floatPopupClickable } from "../amount-popup";
 import { showBarrier, barrierKindFor } from "../barrier";
 import { incomingPulse, promptBubble, rejectedBanner, reverseCoinTrail, type BubbleHandle } from "../arena-effects";
+import { BUILDINGS } from "../../lib/buildings";
 
 export const TILE = 16;
 export const GRID_W = 20;
@@ -180,25 +181,36 @@ export class CityScene extends Phaser.Scene {
     // Six building landmarks. Each one has its OWN archetype drawn from
     // primitives — a market stall, a columned bank, a post-office box, an
     // inspector's kiosk, an actual pool of water, and a vault block.
-    const defs: Array<{ tx: number; ty: number; label: string; draw: (scene: Phaser.Scene, cx: number, cy: number) => void }> = [
-      { tx:  2, ty:  2, label: "Market",      draw: drawMarket      },
-      { tx:  7, ty:  2, label: "Bank",        draw: drawBank        },
-      { tx: 12, ty:  2, label: "Post Office", draw: drawPostOffice  },
-      { tx: 18, ty:  2, label: "Inspector",   draw: drawInspector   },
-      { tx:  5, ty: 10, label: "Pool",        draw: drawPool        },
-      { tx: 14, ty: 10, label: "Escrow",      draw: drawEscrow      }
-    ];
+    const DRAW_BY_LABEL: Record<string, (s: Phaser.Scene, cx: number, cy: number) => void> = {
+      "Market":      drawMarket,
+      "Bank":        drawBank,
+      "Post Office": drawPostOffice,
+      "Inspector":   drawInspector,
+      "Pool":        drawPool,
+      "Escrow":      drawEscrow
+    };
 
-    for (const d of defs) {
+    for (const d of BUILDINGS) {
       const cx = d.tx * TILE + TILE;
       const cy = d.ty * TILE + TILE * 0.6;  // building center pulled UP a bit so label fits above
-      d.draw(this, cx, cy);
+      const draw = DRAW_BY_LABEL[d.label];
+      if (draw) draw(this, cx, cy);
       this.add.text(cx, cy - TILE * 1.6, d.label, {
         fontFamily: "ui-monospace, monospace",
         fontSize: "13px",
         color: "#ede8df",
         fontStyle: "700"
       }).setOrigin(0.5, 1).setResolution(4);
+
+      // Transparent hit-area over the building footprint — dispatches the
+      // nac:building-click event which BuildingPanel listens to.
+      const hit = this.add.rectangle(cx, cy, TILE * 3, TILE * 2.5, 0xffffff, 0);
+      hit.setInteractive({ useHandCursor: true });
+      hit.on("pointerup", () => {
+        window.dispatchEvent(new CustomEvent("nac:building-click", { detail: { buildingId: d.id } }));
+      });
+      hit.on("pointerover", () => { hit.setStrokeStyle(1, 0xede8df, 0.3); });
+      hit.on("pointerout",  () => { hit.setStrokeStyle(); });
     }
   }
 }
