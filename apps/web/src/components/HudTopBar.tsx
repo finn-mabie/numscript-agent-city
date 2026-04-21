@@ -58,6 +58,14 @@ export default function HudTopBar() {
       >
         Try to compromise · /
       </button>
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent("nac:board-toggle"))}
+        className="ml-2 text-[10px] uppercase tracking-wider border border-[var(--mute)] text-[var(--paper)] px-2 py-1 hover:bg-[var(--mute)] transition-colors pointer-events-auto"
+        title="Toggle the intent board (shortcut: b)"
+      >
+        Board · b
+      </button>
     </div>
   );
 }
