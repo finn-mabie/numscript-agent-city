@@ -54,7 +54,12 @@ export interface LedgerTx extends LedgerPreview {
 }
 
 export interface InvokeError {
-  phase: "load" | "validate" | "render" | "dry-run" | "commit";
+  /**
+   * Which guard rejected the call. "authorization" is reserved for higher-
+   * level callers (the orchestrator's self-owned-param check) — the engine
+   * itself only produces "load" | "validate" | "render" | "dry-run" | "commit".
+   */
+  phase: "load" | "validate" | "render" | "dry-run" | "commit" | "authorization";
   code: string;
   message: string;
   detail?: unknown;

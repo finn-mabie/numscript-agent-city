@@ -90,7 +90,7 @@ describe("assertSelfOwned", () => {
     expect(SELF_OWNED_PARAMS.gig_settlement).toEqual(["payer"]);
     expect(SELF_OWNED_PARAMS.escrow_hold).toEqual(["payer"]);
     expect(SELF_OWNED_PARAMS.api_call_fee).toEqual(["caller"]);
-    expect(SELF_OWNED_PARAMS.subscription_charge).toEqual(["provider"]);
+    expect(SELF_OWNED_PARAMS.subscription_charge).toEqual(["subscriber"]);
     expect(SELF_OWNED_PARAMS.refund).toEqual(["merchant"]);
     expect(SELF_OWNED_PARAMS.waterfall_pay).toEqual(["agent_credits", "agent_main"]);
     expect(SELF_OWNED_PARAMS.credit_line_charge).toEqual(["agent_credit", "agent_main"]);
@@ -101,5 +101,39 @@ describe("assertSelfOwned", () => {
     expect(SELF_OWNED_PARAMS.escrow_release).toBeUndefined();
     expect(SELF_OWNED_PARAMS.escrow_refund).toBeUndefined();
     expect(SELF_OWNED_PARAMS.dispute_arbitration).toBeUndefined();
+  });
+
+  // ── Cross-agent-theft coverage matrix ─────────────────────────────────────
+  // For every template in SELF_OWNED_PARAMS, prove that naming a DIFFERENT
+  // agent's account on any one of its self-owned params is rejected. This is
+  // the load-bearing invariant for the "agents can only move their own money"
+  // claim — if a new template is added and forgotten in the map, a coverage
+  // gap is silently opened. This test would have caught subscription_charge's
+  // earlier mis-wiring (provider vs. subscriber).
+  describe("every self-owned template rejects cross-agent param values", () => {
+    for (const [templateId, selfParams] of Object.entries(SELF_OWNED_PARAMS)) {
+      for (const hostileParam of selfParams) {
+        it(`${templateId}: ${hostileParam} pointing at a different agent is rejected`, () => {
+          // Every self-param must be present (otherwise the check short-circuits
+          // on "missing" before reaching the hostile one). Only the hostile param
+          // names another agent; the rest name the acting agent correctly.
+          const params: Record<string, unknown> = {};
+          for (const p of selfParams) {
+            params[p] = p === hostileParam
+              ? "@agents:002:available"       // the attack
+              : (p === "agent_credits" || p === "agent_credit"
+                  ? "@agents:001:credits"
+                  : "@agents:001:available");
+          }
+
+          const r = assertSelfOwned(templateId, params, "001");
+          expect(r.ok).toBe(false);
+          if (!r.ok) {
+            expect(r.paramName).toBe(hostileParam);
+            expect(r.got).toBe("@agents:002:available");
+          }
+        });
+      }
+    }
   });
 });

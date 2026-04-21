@@ -3,7 +3,7 @@
   "description": "Split contested funds atomically between two parties by portion.",
   "params": {
     "funds":       { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
-    "source":      { "type": "account",  "pattern": "^@(escrow|agents):.+$" },
+    "source":      { "type": "account",  "pattern": "^@escrow:.+$" },
     "party_a":     { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
     "party_b":     { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
     "a_portion":   { "type": "portion",  "min": "0%", "max": "100%" },

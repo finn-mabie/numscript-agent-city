@@ -22,7 +22,11 @@ export const SELF_OWNED_PARAMS: Record<string, string[]> = {
   gig_settlement:      ["payer"],
   escrow_hold:         ["payer"],
   api_call_fee:        ["caller"],
-  subscription_charge: ["provider"],
+  // subscription_charge's Numscript moves money OUT of $subscriber, so the
+  // subscriber must be the acting agent. In this sim subscribers initiate
+  // their own renewal payments — providers cannot pull. A real product would
+  // add a pre-authorization token before a provider-initiated variant.
+  subscription_charge: ["subscriber"],
   refund:              ["merchant"],
   waterfall_pay:       ["agent_credits", "agent_main"],
   credit_line_charge:  ["agent_credit", "agent_main"],
@@ -30,7 +34,8 @@ export const SELF_OWNED_PARAMS: Record<string, string[]> = {
   // NOT self-owned (source is not an agent account):
   //   escrow_release, escrow_refund — source is @escrow:job:{id}
   //   revenue_split                 — source is @platform:pool:{name}
-  //   dispute_arbitration           — source is an arbitrated account (escrow or agent), caller is Ivan the Disputant
+  //   dispute_arbitration           — source is an escrow (pattern enforced
+  //                                   at the schema layer; ^@escrow:.+$)
 };
 
 export type AuthorizationResult =

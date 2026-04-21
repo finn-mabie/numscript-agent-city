@@ -130,7 +130,7 @@ export async function tickAgent(
         params: action.input as Record<string, ParamValue>,
         renderedNumscript: "",
         error: {
-          phase: "authorization" as any,  // engine's InvokeError.phase union doesn't include "authorization" yet
+          phase: "authorization",
           code: "NotSelfOwned",
           message: msg
         }
