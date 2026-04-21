@@ -30,6 +30,10 @@ function format(e: CityEvent): string {
     case "relationship-update": return `${head} ${dim(`rel ${e.data?.peerId} ↔ ${e.data?.trust}`)}`;
     case "arena-submit": return `${head} ${cyan("[arena]")} submit attack ${dim(String(e.data?.attackId))}`;
     case "arena-resolved": return `${head} ${cyan("[arena]")} resolved ${String(e.data?.outcome)} ${dim(String(e.data?.attackId))}`;
+    case "offer-posted":
+      return `${head} ${dim("offer")} ${(e.data as any).text?.slice(0, 60) ?? ""}`;
+    case "offer-closed":
+      return `${head} ${dim("offer-closed")} ${(e.data as any).offerId}`;
     default: {
       const _exhaustive: never = e.kind;
       return `${head} ${dim(`(unhandled ${(_exhaustive as any)})`)}`;
