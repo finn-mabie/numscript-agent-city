@@ -20,7 +20,8 @@ export interface IntentLogView {
   reasoning: string;
   templateId: string | null;
   params: Record<string, unknown> | null;
-  outcome: "committed" | "rejected" | "idle";
+  /** "pending" = intent emitted, awaiting commit/reject. Replaced on terminal outcome. */
+  outcome: "pending" | "committed" | "rejected" | "idle";
   errorPhase: string | null;
   errorCode: string | null;
   txId: string | null;
@@ -41,11 +42,23 @@ interface CityState {
 
 const RECENT_CAP = 200;
 
-// A deterministic 4×3 tile layout for the 10 agents, anchored in open ground.
-// Plan 3's tile grid is a 20×12 space; agents start here and wander via random walk.
+// Each agent has a "home" tile next to the building they naturally operate from.
+// The random-walk in agent-sprite.ts biases ~30% of steps toward home, so agents
+// cluster around their post but still wander through the village. Buildings live
+// at y=1 (top row) and y=9 (bottom row); agent homes sit one tile below / above
+// the corresponding building. Freelance agents (Eve/Frank/Grace/Judy) anchor in
+// the middle row.
 const START_POSITIONS: Record<string, [number, number]> = {
-  "001": [ 3, 3], "002": [ 5, 3], "003": [ 7, 3], "004": [ 9, 3], "005": [11, 3],
-  "006": [ 3, 5], "007": [ 5, 5], "008": [ 7, 5], "009": [ 9, 5], "010": [11, 5]
+  "001": [ 2, 2],   // Alice — Market
+  "002": [12, 2],   // Bob — Post Office
+  "003": [17, 2],   // Carol — Inspector
+  "004": [ 7, 2],   // Dave — Bank
+  "005": [ 4, 6],   // Eve — freelance (research)
+  "006": [ 9, 6],   // Frank — freelance (writing)
+  "007": [14, 6],   // Grace — freelance (illustration)
+  "008": [ 5, 10],  // Heidi — Pool
+  "009": [14, 10],  // Ivan — Escrow
+  "010": [18, 6]    // Judy — Red Agent probe zone
 };
 
 export const useCityStore = create<CityState>((set) => ({
@@ -80,26 +93,32 @@ export const useCityStore = create<CityState>((set) => ({
         next.agents = { ...s.agents, [e.agentId]: { ...s.agents[e.agentId], hustleMode: 0 } };
       }
 
-      // Intent / committed / rejected / idle all get logged
+      // Intent / committed / rejected / idle all get logged. When a commit or
+      // reject arrives with a tickId that already has a pending intent entry,
+      // we REPLACE rather than prepend — so the recent log shows one entry
+      // per tx, going pending → terminal as events stream in.
       if (e.kind === "intent" || e.kind === "committed" || e.kind === "rejected" || e.kind === "idle") {
+        const existing = s.recent.find((x) => x.tickId === e.tickId);
         const entry: IntentLogView = {
           agentId: e.agentId,
           tickId: e.tickId,
-          reasoning: e.kind === "intent" ? (e as any).data?.reasoning ?? "" : "",
-          templateId: e.kind === "intent" ? (e as any).data?.tool ?? null
-                    : e.kind === "committed" ? (e as any).data?.templateId ?? null
-                    : null,
-          params: e.kind === "intent" ? (e as any).data?.input ?? null : null,
-          outcome: e.kind === "committed" ? "committed"
-                 : e.kind === "rejected" ? "rejected"
-                 : e.kind === "idle" ? "idle"
-                 : "committed", // intent alone isn't an outcome; a later committed/rejected replaces it
+          reasoning: e.kind === "intent" ? (e as any).data?.reasoning ?? "" : (existing?.reasoning ?? ""),
+          templateId: e.kind === "intent"    ? (e as any).data?.tool ?? null
+                    : e.kind === "committed" ? (e as any).data?.templateId ?? existing?.templateId ?? null
+                    : existing?.templateId ?? null,
+          params:     e.kind === "intent" ? (e as any).data?.input ?? null : (existing?.params ?? null),
+          outcome:    e.kind === "committed" ? "committed"
+                    : e.kind === "rejected"  ? "rejected"
+                    : e.kind === "idle"      ? "idle"
+                    : "pending",  // intent
           errorPhase: e.kind === "rejected" ? (e as any).data?.phase ?? null : null,
           errorCode:  e.kind === "rejected" ? (e as any).data?.code  ?? null : null,
           txId:       e.kind === "committed" ? (e as any).data?.txId ?? null : null,
-          createdAt: e.at
+          createdAt:  existing?.createdAt ?? e.at
         };
-        next.recent = [entry, ...s.recent].slice(0, RECENT_CAP);
+        // Remove any existing entry with this tickId, then prepend the fresh one.
+        const without = s.recent.filter((x) => x.tickId !== e.tickId);
+        next.recent = [entry, ...without].slice(0, RECENT_CAP);
       }
 
       return next;

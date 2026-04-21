@@ -23,6 +23,10 @@ export class CityScene extends Phaser.Scene {
     });
   }
 
+  // Thought bubbles for pending intents, keyed by tickId. Cleared when the
+  // terminal outcome (committed / rejected / idle) arrives.
+  private thinking = new Map<string, Phaser.GameObjects.GameObject[]>();
+
   create() {
     this.cameras.main.setBackgroundColor("#1a2f1a");
     this.buildGround();
@@ -31,18 +35,19 @@ export class CityScene extends Phaser.Scene {
     const initial = useCityStore.getState().agents;
     for (const a of Object.values(initial)) this.spawn(a);
 
-    // React to hydrations that happen AFTER create (common — snapshot fetch
-    // resolves after Phaser mounts).
-    const seenTickIds = new Set<string>();
-    useCityStore.subscribe((s) => {
+    // Subscribe with BOTH current and previous state so we can detect
+    // pending → terminal transitions and animate each step.
+    useCityStore.subscribe((s, prev) => {
       for (const a of Object.values(s.agents)) {
         if (!this.agents.has(a.id)) this.spawn(a);
       }
-      // Animate any new recent entries (newest-first, so break once we hit a seen one).
+      // For each recent entry, compare to its prior outcome (if any) and
+      // animate only on changes. This handles both "fresh intent" and
+      // "pending → commit/reject" transitions cleanly.
       for (const r of s.recent) {
-        if (seenTickIds.has(r.tickId)) break;
-        seenTickIds.add(r.tickId);
-        this.animateForEntry(r);
+        const prior = prev?.recent.find((x) => x.tickId === r.tickId);
+        if (prior?.outcome === r.outcome) continue;
+        this.animateForEntry(r, prior?.outcome);
       }
     });
   }
@@ -51,9 +56,23 @@ export class CityScene extends Phaser.Scene {
     this.agents.set(a.id, new AgentSprite(this, a));
   }
 
-  private animateForEntry(r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null }): void {
+  private animateForEntry(
+    r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null },
+    priorOutcome?: string
+  ): void {
     const src = this.agents.get(r.agentId);
     if (!src) return;
+
+    // Pending → show thinking bubble
+    if (r.outcome === "pending") {
+      this.showThinkingBubble(src, r.tickId, r.templateId ?? "…");
+      return;
+    }
+
+    // Leaving pending → clear bubble before outcome animation
+    if (priorOutcome === "pending" || this.thinking.has(r.tickId)) {
+      this.clearThinkingBubble(r.tickId);
+    }
 
     if (r.outcome === "committed") {
       const peerId = this.counterpartyFromParams(r.params);
@@ -74,7 +93,39 @@ export class CityScene extends Phaser.Scene {
         r.errorPhase === "load"          ? "load" : "other";
       showBarrier(this, src.worldX(), src.worldY(), kind, r.errorCode ?? "REJECTED");
     }
-    // outcome "idle" produces no visual
+    // outcome "idle" produces no visual (bubble was already cleared above)
+  }
+
+  private showThinkingBubble(src: AgentSprite, tickId: string, templateId: string): void {
+    // A small quote-mark + template name above the agent. Lives until the
+    // terminal outcome replaces it (or as a safety, ~8s timeout).
+    const x = src.worldX();
+    const y = src.worldY() - 11;
+    const label = this.add.text(x, y, `⋯ ${templateId}`, {
+      fontFamily: "ui-monospace, monospace",
+      fontSize: "6px",
+      color: "#ede8df",
+      backgroundColor: "#3a3732",
+      padding: { left: 2, right: 2, top: 1, bottom: 1 }
+    }).setOrigin(0.5, 1).setAlpha(0);
+    this.tweens.add({ targets: label, alpha: 1, duration: 180, ease: "cubic.out" });
+    this.thinking.set(tickId, [label]);
+    // Safety timeout — clear if no terminal event arrives in 8s.
+    this.time.delayedCall(8000, () => this.clearThinkingBubble(tickId));
+  }
+
+  private clearThinkingBubble(tickId: string): void {
+    const objs = this.thinking.get(tickId);
+    if (!objs) return;
+    this.thinking.delete(tickId);
+    for (const o of objs) {
+      this.tweens.add({
+        targets: o,
+        alpha: 0,
+        duration: 150,
+        onComplete: () => o.destroy()
+      });
+    }
   }
 
   private counterpartyFromParams(params: Record<string, unknown> | null): string | null {

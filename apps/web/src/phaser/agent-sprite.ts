@@ -2,15 +2,24 @@ import Phaser from "phaser";
 import { TILE, GRID_W, GRID_H } from "./scenes/CityScene";
 import type { AgentView } from "../state/city-store";
 
+// How strongly the random walk biases back toward the agent's home tile.
+// 0 = pure random walk; 1 = always step toward home. 0.35 gives a light drift
+// that keeps agents loose around their building without feeling caged.
+const HOME_BIAS = 0.35;
+// Max tiles an agent can wander from home before the walk forces a return.
+const HOME_RADIUS = 4;
+
 export class AgentSprite {
   readonly sprite: Phaser.GameObjects.Sprite;
   readonly label: Phaser.GameObjects.Text;
   private tx: number;
   private ty: number;
+  private readonly home: { tx: number; ty: number };
 
   constructor(scene: Phaser.Scene, public readonly agent: AgentView) {
     this.tx = agent.x;
     this.ty = agent.y;
+    this.home = { tx: agent.x, ty: agent.y };
     this.sprite = scene.add.sprite(this.px(), this.py(), "chars", 84) // char frame 84 = default humanoid
       .setDisplaySize(TILE, TILE)
       .setTint(this.hexToNumber(agent.color));
@@ -39,10 +48,26 @@ export class AgentSprite {
   }
 
   private step(scene: Phaser.Scene): void {
-    const dx = Phaser.Math.Between(-1, 1);
-    const dy = Phaser.Math.Between(-1, 1);
+    // Distance from home — if we've drifted too far, force a step back.
+    const distH = Math.max(Math.abs(this.tx - this.home.tx), Math.abs(this.ty - this.home.ty));
+    const mustReturn = distH >= HOME_RADIUS;
+
+    let dx: number, dy: number;
+    if (mustReturn || Math.random() < HOME_BIAS) {
+      // Step toward home.
+      dx = Math.sign(this.home.tx - this.tx);
+      dy = Math.sign(this.home.ty - this.ty);
+      // If already at home tile, do a pure random step so we don't freeze.
+      if (dx === 0 && dy === 0) {
+        dx = Phaser.Math.Between(-1, 1);
+        dy = Phaser.Math.Between(-1, 1);
+      }
+    } else {
+      dx = Phaser.Math.Between(-1, 1);
+      dy = Phaser.Math.Between(-1, 1);
+    }
     const nx = Phaser.Math.Clamp(this.tx + dx, 0, GRID_W - 1);
-    const ny = Phaser.Math.Clamp(this.ty + dy, 2, GRID_H - 2); // avoid building row
+    const ny = Phaser.Math.Clamp(this.ty + dy, 0, GRID_H - 1);
     this.tx = nx; this.ty = ny;
 
     scene.tweens.add({
