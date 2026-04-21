@@ -68,4 +68,29 @@ describe("LedgerClient (integration)", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toMatch(/INSUFFICIENT|MISSING/i);
   });
+
+  it("injects Authorization: Bearer <token> when getAuthToken is supplied", async () => {
+    let captured: string | null = null;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (req: any, init: any) => {
+      captured = init?.headers?.["Authorization"] ?? null;
+      // Fall through to the real ledger so the request still completes.
+      return realFetch(req, init);
+    }) as typeof fetch;
+    try {
+      const authedClient = new LedgerClient(url, ledger, {
+        getAuthToken: async () => "sentinel-token"
+      });
+      await authedClient.dryRun({
+        plain: `send [USD/2 1] (
+  source = @mint:genesis allowing unbounded overdraft
+  destination = @test:auth
+)`,
+        vars: {}
+      });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(captured).toBe("Bearer sentinel-token");
+  });
 });
