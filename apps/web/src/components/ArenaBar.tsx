@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useCityStore } from "../state/city-store";
 import { submitArenaAttack, ArenaRateLimitedError } from "../lib/arena-api";
+import { ArenaPresets } from "./ArenaPresets";
+import type { ArenaPreset } from "../lib/arena-presets";
 
 const CHAR_LIMIT = 2000;
 
@@ -45,6 +47,12 @@ export function ArenaBar() {
     window.addEventListener("nac:arena-open", onOpen);
     return () => window.removeEventListener("nac:arena-open", onOpen);
   }, []);
+
+  function onPickPreset(p: ArenaPreset) {
+    setPrompt(p.prompt);
+    setTarget(p.defaultTarget);
+    setTimeout(() => inputRef.current?.focus(), 10);
+  }
 
   async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -129,6 +137,9 @@ export function ArenaBar() {
             className="bg-[var(--ink)] text-[var(--paper)] border border-[var(--mute)] px-2 py-1 text-sm resize-none"
             id="arena-prompt"
           />
+          <div className="mt-1">
+            <ArenaPresets onPick={onPickPreset} />
+          </div>
           <div className="flex justify-between text-[10px] text-[var(--dim)]">
             <span>{prompt.length} / {CHAR_LIMIT}</span>
             <span role="status" aria-live="polite">
