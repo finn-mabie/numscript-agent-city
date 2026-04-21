@@ -142,12 +142,19 @@ export function ArenaBar() {
           </div>
           <div className="flex justify-between text-[10px] text-[var(--dim)]">
             <span>{prompt.length} / {CHAR_LIMIT}</span>
-            <span role="status" aria-live="polite">
-              {status === "sending" ? "submitting…"
-                : status === "error"  ? <span className="text-[var(--scream)]">{errorMsg}</span>
-                : "enter to submit (shift+enter for newline) · esc to cancel"}
-            </span>
+            <span>enter to submit (shift+enter for newline) · esc to cancel</span>
           </div>
+          {(status === "sending" || status === "error") && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`mt-1 text-[11px] leading-snug break-words whitespace-normal ${
+                status === "error" ? "text-[var(--scream)]" : "text-[var(--dim)]"
+              }`}
+            >
+              {status === "sending" ? "submitting…" : errorMsg}
+            </div>
+          )}
         </div>
         <button
           type="submit"

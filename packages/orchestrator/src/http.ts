@@ -1,4 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import type Database from "better-sqlite3";
 import { agentRepo, intentLogRepo } from "./repositories.js";
 import type { ArenaQueue } from "./arena.js";
@@ -29,6 +31,8 @@ export interface StartHttpOptions {
     promptPreview: string;
     submittedAt: number;
   }) => void;
+  /** Absolute path to the templates root. When set, /template/:id and /templates are exposed. */
+  templatesRoot?: string;
 }
 
 export interface HttpHandle {
@@ -219,6 +223,48 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
         if (!r.ok) return json(res, r.status, { error: "ledger lookup failed" });
         const data = extractData(r.body);
         return json(res, 200, normalizeLedgerTx(data));
+      } catch (e) {
+        return json(res, 500, { error: (e as Error).message });
+      }
+    }
+
+    // ── /templates ───────────────────────────────────────────────────────
+    // Minimal listing: just the ids. Useful for a future template browser.
+    if (path === "/templates") {
+      if (!opts.templatesRoot) return json(res, 503, { error: "templates root not configured" });
+      try {
+        const { readdirSync } = await import("node:fs");
+        const ids = readdirSync(opts.templatesRoot, { withFileTypes: true })
+          .filter((d) => d.isDirectory() && /^[a-z][a-z0-9_]+$/.test(d.name))
+          .map((d) => d.name)
+          .sort();
+        return json(res, 200, { templates: ids });
+      } catch (e) {
+        return json(res, 500, { error: (e as Error).message });
+      }
+    }
+
+    // ── /template/:id ────────────────────────────────────────────────────
+    // Returns the raw Numscript source + schema + example for a given template.
+    // Used by the front-end TxPanel to show WHY a tx was structured the way it was.
+    const templateMatch = path.match(/^\/template\/([a-z][a-z0-9_]+)$/);
+    if (templateMatch) {
+      if (!opts.templatesRoot) return json(res, 503, { error: "templates root not configured" });
+      const id = templateMatch[1];
+      // Defense-in-depth: id already regex-filtered, but resolve + prefix-check anyway
+      const dir = resolvePath(opts.templatesRoot, id);
+      if (!dir.startsWith(opts.templatesRoot)) return json(res, 400, { error: "invalid template id" });
+      const numPath = resolvePath(dir, "template.num");
+      const schemaPath = resolvePath(dir, "schema.json");
+      const examplePath = resolvePath(dir, "example.json");
+      const readmePath = resolvePath(dir, "README.md");
+      if (!existsSync(numPath)) return json(res, 404, { error: `template ${id} not found` });
+      try {
+        const source = readFileSync(numPath, "utf8");
+        const schema = existsSync(schemaPath) ? JSON.parse(readFileSync(schemaPath, "utf8")) : null;
+        const example = existsSync(examplePath) ? JSON.parse(readFileSync(examplePath, "utf8")) : null;
+        const readme = existsSync(readmePath) ? readFileSync(readmePath, "utf8") : null;
+        return json(res, 200, { id, source, schema, example, readme });
       } catch (e) {
         return json(res, 500, { error: (e as Error).message });
       }

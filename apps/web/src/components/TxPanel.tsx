@@ -2,8 +2,20 @@
 import { useEffect, useState } from "react";
 import { useCityStore } from "../state/city-store";
 
+const ORCH = process.env.NEXT_PUBLIC_ORCH_HTTP ?? "http://127.0.0.1:3071";
+
+interface TemplateDoc {
+  id: string;
+  source: string;
+  schema: unknown;
+  example: unknown;
+  readme: string | null;
+}
+
 export default function TxPanel() {
   const [tickId, setTickId] = useState<string | null>(null);
+  const [tmpl, setTmpl] = useState<TemplateDoc | null>(null);
+  const [tmplError, setTmplError] = useState<string | null>(null);
   const recent = useCityStore((s) => s.recent);
 
   useEffect(() => {
@@ -12,9 +24,28 @@ export default function TxPanel() {
     return () => window.removeEventListener("nac:tx-click", h);
   }, []);
 
-  if (!tickId) return null;
-  const r = recent.find((x) => x.tickId === tickId);
-  if (!r) return null;
+  const r = tickId ? recent.find((x) => x.tickId === tickId) : null;
+
+  // Fetch the template source whenever a new templateId is shown.
+  useEffect(() => {
+    setTmpl(null);
+    setTmplError(null);
+    if (!r?.templateId) return;
+    const ctrl = new AbortController();
+    fetch(`${ORCH}/template/${r.templateId}`, { signal: ctrl.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const doc: TemplateDoc = await res.json();
+        setTmpl(doc);
+      })
+      .catch((e) => {
+        if (e.name === "AbortError") return;
+        setTmplError(e.message);
+      });
+    return () => ctrl.abort();
+  }, [r?.templateId]);
+
+  if (!tickId || !r) return null;
 
   return (
     <aside
@@ -39,6 +70,26 @@ export default function TxPanel() {
 {r.params ? JSON.stringify(r.params, null, 2) : "(no params recorded)"}
       </pre>
 
+      {r.templateId && (
+        <>
+          <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim flex items-baseline gap-2">
+            <span>Numscript · template source</span>
+            <span className="text-[9px] normal-case tracking-normal text-dim/60">({r.templateId}.num)</span>
+          </h3>
+          {tmplError && (
+            <div className="text-[11px] text-scream">Could not load template: {tmplError}</div>
+          )}
+          {!tmpl && !tmplError && (
+            <div className="text-[11px] text-dim italic">loading template source…</div>
+          )}
+          {tmpl && (
+            <pre className="bg-ink border border-mute p-2.5 whitespace-pre-wrap text-[11px] leading-relaxed text-paper overflow-x-auto">
+{highlightNumscript(tmpl.source)}
+            </pre>
+          )}
+        </>
+      )}
+
       <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Outcome</h3>
       <div className="text-paper">
         {r.outcome === "pending"   && <span className="text-dim">⋯ pending (LLM picked tool; cage evaluating)</span>}
@@ -55,6 +106,70 @@ export default function TxPanel() {
       )}
     </aside>
   );
+}
+
+/**
+ * Lightweight syntax highlighter for Numscript. Returns a JSX fragment with
+ * keywords/comments/strings/vars color-coded using design tokens. Not a full
+ * lexer — just enough visual scaffolding to make the template readable at a
+ * glance. Falls back gracefully: unknown text renders plainly.
+ */
+function highlightNumscript(src: string): React.ReactNode {
+  const KEYWORDS = /\b(vars|send|source|destination|set_tx_meta|allocating|to|remaining|max|monetary|account|string|number|portion|asset)\b/g;
+  const lines = src.split("\n");
+  return lines.map((line, lineIdx) => {
+    // Full-line comment
+    if (/^\s*\/\//.test(line)) {
+      return (
+        <span key={lineIdx} style={{ color: "var(--dim)", fontStyle: "italic" }}>
+          {line}
+          {"\n"}
+        </span>
+      );
+    }
+    const parts: Array<{ text: string; color?: string; bold?: boolean }> = [];
+    let remaining = line;
+    const push = (text: string, color?: string, bold?: boolean) => {
+      if (text) parts.push({ text, color, bold });
+    };
+    while (remaining.length > 0) {
+      // String literal "..."
+      const strMatch = remaining.match(/^"[^"]*"/);
+      if (strMatch) { push(strMatch[0], "#d9a86a"); remaining = remaining.slice(strMatch[0].length); continue; }
+      // Template variable $foo
+      const varMatch = remaining.match(/^\$[a-zA-Z_][a-zA-Z0-9_]*/);
+      if (varMatch) { push(varMatch[0], "var(--gold)"); remaining = remaining.slice(varMatch[0].length); continue; }
+      // Account literal @name[:sub]
+      const acctMatch = remaining.match(/^@[a-zA-Z_][a-zA-Z0-9_:]*/);
+      if (acctMatch) { push(acctMatch[0], "#6fa8dc"); remaining = remaining.slice(acctMatch[0].length); continue; }
+      // Number / percentage
+      const numMatch = remaining.match(/^[0-9]+(\.[0-9]+)?%?/);
+      if (numMatch) { push(numMatch[0], "#b5d29a"); remaining = remaining.slice(numMatch[0].length); continue; }
+      // Keyword run (check at word boundary)
+      KEYWORDS.lastIndex = 0;
+      const kwTest = remaining.match(/^([a-z_][a-z0-9_]*)/i);
+      if (kwTest && /\b(vars|send|source|destination|set_tx_meta|allocating|to|remaining|max|monetary|account|string|number|portion|asset)\b/.test(kwTest[1])) {
+        push(kwTest[1], "#c27ba0", true);
+        remaining = remaining.slice(kwTest[1].length);
+        continue;
+      }
+      // Inline comment // ...
+      if (remaining.startsWith("//")) { push(remaining, "var(--dim)"); remaining = ""; continue; }
+      // Otherwise emit one char
+      push(remaining[0]);
+      remaining = remaining.slice(1);
+    }
+    return (
+      <span key={lineIdx}>
+        {parts.map((p, i) => (
+          <span key={i} style={{ color: p.color, fontWeight: p.bold ? 600 : undefined }}>
+            {p.text}
+          </span>
+        ))}
+        {"\n"}
+      </span>
+    );
+  });
 }
 
 function LedgerLink({ txId }: { txId: string }) {

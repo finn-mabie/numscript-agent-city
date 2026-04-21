@@ -1,7 +1,35 @@
 #!/usr/bin/env tsx
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { readFileSync, existsSync } from "node:fs";
 import { LedgerClient, loadTemplates, clientCredentials } from "@nac/template-engine";
+
+// Auto-load .env from the repo root so `pnpm city:start` works without
+// manual `export` incantations. Walks up from cwd looking for the nearest
+// .env. Values already set in the shell win (don't clobber).
+(function loadDotenv() {
+  const candidates = [
+    process.env.INIT_CWD,
+    process.cwd(),
+    resolve(process.cwd(), ".."),
+    resolve(process.cwd(), "../.."),
+    resolve(process.cwd(), "../../..")
+  ].filter(Boolean) as string[];
+  for (const dir of candidates) {
+    const envPath = resolve(dir, ".env");
+    if (!existsSync(envPath)) continue;
+    for (const line of readFileSync(envPath, "utf8").split("\n")) {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/i);
+      if (!m) continue;
+      const [, key, rawVal] = m;
+      // Only skip if shell has a non-empty value — empty strings in the shell
+      // are usually accidental leftovers and should NOT block the .env file.
+      if (process.env[key]) continue;
+      process.env[key] = rawVal.replace(/^['"]|['"]$/g, "");
+    }
+    break; // first match wins
+  }
+})();
 import {
   openDb, agentRepo, ROSTER,
   anthropicLLM, tickAgent, startScheduler, startEventBus,
@@ -74,6 +102,7 @@ async function main() {
     db,
     getBalance: (addr) => ledger.getBalance(addr, "USD/2"),
     ledgerGet: (path) => ledger.get(path),
+    templatesRoot,
     arenaQueue,
     arenaRepo: arena,
     arenaSalt,
