@@ -44,7 +44,9 @@ export type CityEventKind =
   | "idle"
   | "hustle-enter"
   | "hustle-exit"
-  | "relationship-update";
+  | "relationship-update"
+  | "arena-submit"
+  | "arena-resolved";
 
 export interface CityEvent {
   kind: CityEventKind;

@@ -28,7 +28,10 @@ function format(e: CityEvent): string {
     case "hustle-enter": return `${head} ${yellow("♦ hustle mode on")}`;
     case "hustle-exit":  return `${head} ${yellow("♦ hustle mode off")}`;
     case "relationship-update": return `${head} ${dim(`rel ${e.data?.peerId} ↔ ${e.data?.trust}`)}`;
+    case "arena-submit": return `${head} ${cyan("[arena]")} submit attack ${dim(String(e.data?.attackId))}`;
+    case "arena-resolved": return `${head} ${cyan("[arena]")} resolved ${String(e.data?.outcome)} ${dim(String(e.data?.attackId))}`;
   }
+  return `${head} ${dim("(unknown)")}`;
 }
 
 const ws = new WebSocket(url);
