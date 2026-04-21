@@ -15,7 +15,9 @@ export class CityScene extends Phaser.Scene {
   constructor() { super({ key: "city" }); }
 
   preload() {
-    this.load.image("tiles", "/assets/tiny-town/tilemap_packed.png");
+    this.load.spritesheet("tiles", "/assets/tiny-town/tilemap_packed.png", {
+      frameWidth: 16, frameHeight: 16
+    });
     this.load.spritesheet("chars", "/assets/characters/tiny-characters.png", {
       frameWidth: 16, frameHeight: 16
     });
