@@ -105,3 +105,83 @@ export function intentLogRepo(db: Database.Database) {
     }
   };
 }
+
+// ── Arena attacks ─────────────────────────────────────────────────────────
+export interface ArenaAttackRecord {
+  attackId: string;
+  targetAgentId: string;
+  promptHash: string;
+  promptPreview: string;
+  ipHash: string;
+  submittedAt: number;
+  status: "queued" | "running" | "committed" | "rejected" | "expired";
+  tickId: string | null;
+  outcomePhase: string | null;
+  outcomeCode: string | null;
+  resolvedAt: number | null;
+}
+
+export function arenaRepo(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT INTO arena_attacks
+      (attack_id, target_agent_id, prompt_hash, prompt_preview, ip_hash, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const get = db.prepare(`SELECT * FROM arena_attacks WHERE attack_id = ?`);
+  const setStatus = db.prepare(`UPDATE arena_attacks SET status=? WHERE attack_id=?`);
+  const recordOutcome = db.prepare(`
+    UPDATE arena_attacks
+    SET status=?, tick_id=?, outcome_phase=?, outcome_code=?, resolved_at=?
+    WHERE attack_id=?
+  `);
+
+  const row2rec = (r: any): ArenaAttackRecord => ({
+    attackId: r.attack_id,
+    targetAgentId: r.target_agent_id,
+    promptHash: r.prompt_hash,
+    promptPreview: r.prompt_preview,
+    ipHash: r.ip_hash,
+    submittedAt: r.submitted_at,
+    status: r.status,
+    tickId: r.tick_id,
+    outcomePhase: r.outcome_phase,
+    outcomeCode: r.outcome_code,
+    resolvedAt: r.resolved_at
+  });
+
+  return {
+    insert(args: {
+      attackId: string;
+      targetAgentId: string;
+      promptHash: string;
+      promptPreview: string;
+      ipHash: string;
+      submittedAt: number;
+    }): void {
+      insert.run(
+        args.attackId, args.targetAgentId, args.promptHash,
+        args.promptPreview, args.ipHash, args.submittedAt
+      );
+    },
+    get(attackId: string): ArenaAttackRecord | null {
+      const r = get.get(attackId);
+      return r ? row2rec(r) : null;
+    },
+    markRunning(attackId: string): void {
+      setStatus.run("running", attackId);
+    },
+    recordOutcome(args: {
+      attackId: string;
+      tickId: string;
+      status: "committed" | "rejected";
+      outcomePhase: string | null;
+      outcomeCode: string | null;
+      resolvedAt: number;
+    }): void {
+      recordOutcome.run(
+        args.status, args.tickId, args.outcomePhase, args.outcomeCode,
+        args.resolvedAt, args.attackId
+      );
+    }
+  };
+}
