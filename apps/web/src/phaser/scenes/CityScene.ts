@@ -3,7 +3,7 @@ import { useCityStore } from "../../state/city-store";
 import { AgentSprite } from "../agent-sprite";
 import { emitCoins } from "../coin-flow";
 import { floatPopup, floatPopupClickable } from "../amount-popup";
-import { showBarrier, type BarrierKind } from "../barrier";
+import { showBarrier, barrierKindFor } from "../barrier";
 import { incomingPulse, promptBubble, rejectedBanner, reverseCoinTrail, type BubbleHandle } from "../arena-effects";
 
 export const TILE = 16;
@@ -108,11 +108,7 @@ export class CityScene extends Phaser.Scene {
         () => window.dispatchEvent(new CustomEvent("nac:tx-click", { detail: { tickId: r.tickId } }))
       );
     } else if (r.outcome === "rejected") {
-      const kind: BarrierKind =
-        r.errorPhase === "authorization" ? "authorization" :
-        r.errorPhase === "validate"      ? "validate" :
-        r.errorPhase === "commit"        ? "commit" :
-        r.errorPhase === "load"          ? "load" : "other";
+      const kind = barrierKindFor(r.errorPhase, r.errorCode);
       showBarrier(this, src.worldX(), src.worldY(), kind, r.errorCode ?? "REJECTED");
       // Arena attack → dramatic banner + reverse coin trail
       if (r.attackId) {
