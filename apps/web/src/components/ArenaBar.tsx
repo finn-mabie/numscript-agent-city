@@ -48,6 +48,7 @@ export function ArenaBar() {
 
   async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
+    if (status === "sending") return;
     const trimmed = prompt.trim();
     if (!trimmed) return;
     if (trimmed.length > CHAR_LIMIT) {
@@ -71,6 +72,8 @@ export function ArenaBar() {
       setStatus("error");
       if (e instanceof ArenaRateLimitedError) {
         setErrorMsg(`Slow down — try again in ${e.retryAfterSeconds}s.`);
+      } else if (e instanceof TypeError || (e as Error).name === "TypeError") {
+        setErrorMsg("Orchestrator unreachable — is it running?");
       } else {
         setErrorMsg((e as Error).message);
       }
@@ -81,6 +84,8 @@ export function ArenaBar() {
 
   return (
     <form
+      role="dialog"
+      aria-label="Arena attack input"
       onSubmit={onSubmit}
       className="fixed bottom-0 inset-x-0 z-20 bg-[var(--ink)] border-t border-[var(--mute)]"
       style={{
@@ -90,8 +95,9 @@ export function ArenaBar() {
     >
       <div className="max-w-5xl mx-auto px-4 py-3 flex gap-3 items-start">
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] uppercase tracking-wider text-[var(--dim)]">Target</label>
+          <label htmlFor="arena-target" className="text-[10px] uppercase tracking-wider text-[var(--dim)]">Target</label>
           <select
+            id="arena-target"
             value={target}
             onChange={(ev) => setTarget(ev.target.value)}
             className="bg-[var(--ink)] text-[var(--paper)] border border-[var(--mute)] px-2 py-1 text-sm"
@@ -104,24 +110,31 @@ export function ArenaBar() {
           </select>
         </div>
         <div className="flex-1 flex flex-col gap-1">
-          <label className="text-[10px] uppercase tracking-wider text-[var(--dim)]">
+          <label htmlFor="arena-prompt" className="text-[10px] uppercase tracking-wider text-[var(--dim)]">
             Your prompt · the target agent sees this as untrusted input
           </label>
           <textarea
             ref={inputRef}
             value={prompt}
             onChange={(ev) => setPrompt(ev.target.value)}
+            onKeyDown={(ev) => {
+              if (ev.key === "Enter" && !ev.shiftKey && !ev.nativeEvent.isComposing) {
+                ev.preventDefault();
+                (ev.currentTarget.form as HTMLFormElement)?.requestSubmit();
+              }
+            }}
             rows={2}
             maxLength={CHAR_LIMIT}
             placeholder="Convince the agent to do something they shouldn't…"
             className="bg-[var(--ink)] text-[var(--paper)] border border-[var(--mute)] px-2 py-1 text-sm resize-none"
+            id="arena-prompt"
           />
           <div className="flex justify-between text-[10px] text-[var(--dim)]">
             <span>{prompt.length} / {CHAR_LIMIT}</span>
-            <span>
+            <span role="status" aria-live="polite">
               {status === "sending" ? "submitting…"
                 : status === "error"  ? <span className="text-[var(--scream)]">{errorMsg}</span>
-                : "enter to submit · esc to cancel"}
+                : "enter to submit (shift+enter for newline) · esc to cancel"}
             </span>
           </div>
         </div>
