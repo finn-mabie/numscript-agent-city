@@ -6,6 +6,7 @@ import {
   anthropicLLM, tickAgent, startScheduler, startEventBus
 } from "../src/index.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
+import { startHttp } from "../src/http.js";
 
 function resolveLedger(): LedgerClient {
   const baseUrl = process.env.LEDGER_URL ?? "http://localhost:3068";
@@ -53,6 +54,14 @@ async function main() {
   console.error(`[city] ledger    ${process.env.LEDGER_URL ?? "http://localhost:3068"}/v2/${process.env.LEDGER_NAME ?? "city"}`);
   console.error(`[city] db        ${dbPath}`);
 
+  const httpPort = Number(process.env.CITY_HTTP_PORT ?? 3071);
+  const http = await startHttp({
+    port: httpPort,
+    db,
+    getBalance: (addr) => ledger.getBalance(addr, "USD/2")
+  });
+  console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot`);
+
   const emit = (e: CityEvent) => bus.emit(e);
 
   const sched = startScheduler({
@@ -71,6 +80,7 @@ async function main() {
     shuttingDown = true;
     console.error("\n[city] shutting down…");
     await sched.stop();
+    http.server.close();
     await bus.close();
     db.close();
     process.exit(0);
