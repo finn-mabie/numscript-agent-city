@@ -30,8 +30,11 @@ function format(e: CityEvent): string {
     case "relationship-update": return `${head} ${dim(`rel ${e.data?.peerId} ↔ ${e.data?.trust}`)}`;
     case "arena-submit": return `${head} ${cyan("[arena]")} submit attack ${dim(String(e.data?.attackId))}`;
     case "arena-resolved": return `${head} ${cyan("[arena]")} resolved ${String(e.data?.outcome)} ${dim(String(e.data?.attackId))}`;
+    default: {
+      const _exhaustive: never = e.kind;
+      return `${head} ${dim(`(unhandled ${(_exhaustive as any)})`)}`;
+    }
   }
-  return `${head} ${dim("(unknown)")}`;
 }
 
 const ws = new WebSocket(url);
