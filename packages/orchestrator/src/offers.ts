@@ -14,20 +14,32 @@ export function newOfferId(now: () => number = Date.now): string {
  * Validates + normalizes agent-authored offer text.
  *
  * Rules:
+ *   - Strip control characters (\x00-\x1F, including newlines/tabs/CRs) to spaces.
+ *     LLMs routinely emit trailing \n or formatting \t; strip rather than reject
+ *     so we don't lose the entire post to incidental whitespace.
  *   - Trim; collapse runs of whitespace to a single space.
- *   - Reject empty (post-trim) or > 140 chars.
- *   - Reject control characters (\x00-\x1F) and newlines.
+ *   - Reject only truly unusable input (empty after trim or > 400 chars which
+ *     suggests a rogue paste). Over 200 chars → truncate with ellipsis rather
+ *     than reject: LLMs frequently overshoot the tool-schema maxLength by a
+ *     handful of characters and we'd rather keep the post than lose it.
  *   - Neutralize [end board] / [end incoming prompt] tokens (case-insensitive)
  *     by inserting a double-space — same mitigation as Plan 4's arena prompts.
  *
  * Returns the normalized text, or null if invalid.
  */
+export const OFFER_TEXT_MAX_LEN = 200;
+const OFFER_TEXT_HARD_REJECT_LEN = 400;
+
 export function validateOfferText(input: string): string | null {
   if (typeof input !== "string") return null;
-  if (/[\x00-\x1F]/.test(input)) return null;
-  const trimmed = input.replace(/\s+/g, " ").trim();
-  if (trimmed.length === 0 || trimmed.length > 140) return null;
-  const neutralized = trimmed
+  const cleaned = input.replace(/[\x00-\x1F]/g, " ");
+  const trimmed = cleaned.replace(/\s+/g, " ").trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > OFFER_TEXT_HARD_REJECT_LEN) return null;
+  const capped = trimmed.length > OFFER_TEXT_MAX_LEN
+    ? trimmed.slice(0, OFFER_TEXT_MAX_LEN - 1).trimEnd() + "…"
+    : trimmed;
+  const neutralized = capped
     .replace(/\[end board\]/gi,           "[end  board]")
     .replace(/\[end incoming prompt\]/gi, "[end  incoming prompt]");
   return neutralized;
@@ -42,16 +54,16 @@ export const POST_OFFER_TOOL: AnthropicTool = {
   description:
     "Post a short public message to the city's Intent Board. Use this to ask " +
     "for a service, offer one, advertise spread opportunities, or respond to " +
-    "another offer. ≤140 characters. Costs nothing but is visible to every " +
-    "other agent. Not a commitment — acts as a conversation starter that may " +
-    "lead to a template call.",
+    "another offer. Keep it brief — aim for 120-180 characters. Costs nothing " +
+    "but is visible to every other agent. Not a commitment — acts as a " +
+    "conversation starter that may lead to a template call.",
   input_schema: {
     type: "object",
     properties: {
       text: {
         type: "string",
-        maxLength: 140,
-        description: "Your public message. Keep under 140 chars. One line, no newlines."
+        maxLength: 200,
+        description: "Your public message. One line, ≤200 chars. No newlines."
       },
       in_reply_to: {
         type: "string",

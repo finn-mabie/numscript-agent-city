@@ -20,17 +20,26 @@ describe("validateOfferText", () => {
     expect(validateOfferText("   ")).toBeNull();
   });
 
-  it("rejects > 140 chars after trim", () => {
-    expect(validateOfferText("x".repeat(141))).toBeNull();
+  it("truncates > 200 chars with an ellipsis (LLMs routinely overshoot)", () => {
+    const out = validateOfferText("x".repeat(250))!;
+    expect(out.length).toBe(200);
+    expect(out.endsWith("…")).toBe(true);
   });
 
-  it("accepts exactly 140 chars", () => {
-    expect(validateOfferText("x".repeat(140))).toBe("x".repeat(140));
+  it("rejects only truly rogue inputs (> 400 chars)", () => {
+    expect(validateOfferText("x".repeat(401))).toBeNull();
   });
 
-  it("rejects newlines and control chars", () => {
-    expect(validateOfferText("hi\nthere")).toBeNull();
-    expect(validateOfferText("hi\x00there")).toBeNull();
+  it("accepts exactly 200 chars", () => {
+    expect(validateOfferText("x".repeat(200))).toBe("x".repeat(200));
+  });
+
+  it("strips newlines and control chars (LLMs emit trailing \\n — don't lose the whole post)", () => {
+    expect(validateOfferText("hi\nthere")).toBe("hi there");
+    expect(validateOfferText("hi\x00there")).toBe("hi there");
+    expect(validateOfferText("  hi\t\tthere  ")).toBe("hi there");
+    expect(validateOfferText("offer text\n")).toBe("offer text");
+    expect(validateOfferText("\n\n   \r\n")).toBeNull(); // still rejects if only whitespace after strip
   });
 
   it("neutralizes [end board] and [end incoming prompt] tokens", () => {
@@ -44,6 +53,6 @@ describe("POST_OFFER_TOOL", () => {
     expect(POST_OFFER_TOOL.name).toBe("post_offer");
     expect(POST_OFFER_TOOL.input_schema.type).toBe("object");
     expect(POST_OFFER_TOOL.input_schema.required).toEqual(["text"]);
-    expect((POST_OFFER_TOOL.input_schema.properties.text as any).maxLength).toBe(140);
+    expect((POST_OFFER_TOOL.input_schema.properties.text as any).maxLength).toBe(200);
   });
 });

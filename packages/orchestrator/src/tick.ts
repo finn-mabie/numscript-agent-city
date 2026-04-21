@@ -36,9 +36,13 @@ export interface TickDeps {
 
 // Tick intervals are env-configurable so demo/visual-testing can shorten
 // them without touching production defaults. Values are milliseconds.
-const DEMO = process.env.DEMO_MODE === "1";
-const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (DEMO ? 20_000 : 7 * 60 * 1000));
-const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (DEMO ? 40_000 : 13 * 60 * 1000));
+// Tick cadence. Demo is the default so the city feels alive on first boot —
+// set SLOW_TICKS=1 for the original 7-13 min "realistic" pacing when you want
+// the demo to mirror production rhythm. TICK_MIN_MS / TICK_MAX_MS still win
+// when set explicitly.
+const SLOW = process.env.SLOW_TICKS === "1";
+const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (SLOW ? 7 * 60 * 1000  : 20_000));
+const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (SLOW ? 13 * 60 * 1000 : 40_000));
 const LOW_BALANCE_TRACKER = new Map<string, number>();
 const OFFER_TTL_MS = 5 * 60_000;
 
