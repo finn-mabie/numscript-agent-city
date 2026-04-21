@@ -40,6 +40,7 @@ const DEMO = process.env.DEMO_MODE === "1";
 const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (DEMO ? 20_000 : 7 * 60 * 1000));
 const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (DEMO ? 40_000 : 13 * 60 * 1000));
 const LOW_BALANCE_TRACKER = new Map<string, number>();
+const OFFER_TTL_MS = 5 * 60_000;
 
 function nextTickAt(now: number): number {
   const span = MAX_TICK_INTERVAL_MS - MIN_TICK_INTERVAL_MS;
@@ -181,6 +182,12 @@ export async function tickAgent(
         });
         ag.updateNextTick(agent.id, nextTickAt(Date.now()));
         deps.emit({ kind: "idle", agentId: agent.id, tickId, at: Date.now() });
+        recordAndEmitArenaResolved({
+          queued, tickId, agentId: agent.id,
+          arenaRepo: deps.arenaRepo, emit: deps.emit,
+          outcome: "idle", status: "rejected",
+          phase: null, code: "IDLE"
+        });
         return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, idle: true } };
       }
 
@@ -193,7 +200,7 @@ export async function tickAgent(
 
       const offerId = newOfferId();
       const createdAt = Date.now();
-      const expiresAt = createdAt + 5 * 60_000;
+      const expiresAt = createdAt + OFFER_TTL_MS;
       deps.offerRepo.insert({
         id: offerId, authorAgentId: agent.id, text,
         inReplyTo, createdAt, expiresAt
@@ -223,6 +230,15 @@ export async function tickAgent(
       }
 
       ag.updateNextTick(agent.id, nextTickAt(Date.now()));
+      // A visitor-queued prompt that resolved into a post_offer is still a cage
+      // "win" — no financial damage was done. Close the arena record as idle-ish
+      // (the attack produced only a board post, not a ledger move).
+      recordAndEmitArenaResolved({
+        queued, tickId, agentId: agent.id,
+        arenaRepo: deps.arenaRepo, emit: deps.emit,
+        outcome: "idle", status: "rejected",
+        phase: null, code: "POST_OFFER"
+      });
       return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, postOffer: true, offerId } };
     }
 
