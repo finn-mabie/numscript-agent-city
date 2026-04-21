@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 import { resolve } from "node:path";
+import { randomBytes } from "node:crypto";
 import { LedgerClient, loadTemplates, clientCredentials } from "@nac/template-engine";
 import {
   openDb, agentRepo, ROSTER,
-  anthropicLLM, tickAgent, startScheduler, startEventBus
+  anthropicLLM, tickAgent, startScheduler, startEventBus,
+  createArenaQueue, arenaRepo
 } from "../src/index.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
 import { startHttp } from "../src/http.js";
@@ -54,21 +56,52 @@ async function main() {
   console.error(`[city] ledger    ${process.env.LEDGER_URL ?? "http://localhost:3068"}/v2/${process.env.LEDGER_NAME ?? "city"}`);
   console.error(`[city] db        ${dbPath}`);
 
+  const arenaQueue = createArenaQueue();
+  const arena = arenaRepo(db);
+  const arenaSalt = process.env.ARENA_SALT ?? randomBytes(24).toString("hex");
+
   const httpPort = Number(process.env.CITY_HTTP_PORT ?? 3071);
   const http = await startHttp({
     port: httpPort,
     db,
     getBalance: (addr) => ledger.getBalance(addr, "USD/2"),
-    ledgerGet: (path) => ledger.get(path)
+    ledgerGet: (path) => ledger.get(path),
+    arenaQueue,
+    arenaRepo: arena,
+    arenaSalt,
+    arenaRateLimit: { max: 5, windowMs: 60_000 },
+    advanceNextTickFor: (agentId) => {
+      // Bring the target agent's next tick forward so the attack fires quickly.
+      // If they're already due within 3s, leave it alone.
+      const a = ag.get(agentId);
+      if (!a) return;
+      const soon = Date.now() + 2_000;
+      if (a.nextTickAt > soon) ag.updateNextTick(agentId, soon);
+      bus.emit({
+        kind: "arena-submit",
+        agentId,
+        tickId: `arena:pending`,
+        at: Date.now(),
+        data: {
+          attackId: "pending",      // real attackId is in the /arena response; UI uses the submit event only for the pulse
+          targetAgentId: agentId,
+          promptPreview: "",
+          submittedAt: Date.now()
+        }
+      });
+    }
   });
-  console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot`);
+  console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot (POST /arena)`);
 
   const emit = (e: CityEvent) => bus.emit(e);
 
   const sched = startScheduler({
     db,
     tickOne: (agent): Promise<TickOutcome> =>
-      tickAgent(agent, { db, ledger, llm, templates, templatesRoot, emit }),
+      tickAgent(agent, {
+        db, ledger, llm, templates, templatesRoot, emit,
+        arenaQueue, arenaRepo: arena
+      }),
     onError: (id, err) => emit({
       kind: "rejected", agentId: id, tickId: `sched:${Date.now()}`, at: Date.now(),
       data: { phase: "scheduler", code: "TICK_FAILURE", message: (err as Error).message }
