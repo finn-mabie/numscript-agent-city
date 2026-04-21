@@ -17,3 +17,7 @@ export { startScheduler } from "./scheduler.js";
 export type { SchedulerOptions, SchedulerHandle } from "./scheduler.js";
 export { startEventBus } from "./events.js";
 export type { EventBus } from "./events.js";
+export { createArenaQueue, newAttackId, hashPrompt, hashIp, promptPreview } from "./arena.js";
+export type { ArenaQueue, ArenaQueueOptions, QueuedAttack } from "./arena.js";
+export { arenaRepo } from "./repositories.js";
+export type { ArenaAttackRecord } from "./repositories.js";

@@ -10,6 +10,8 @@ import { ROSTER } from "../src/roster.js";
 import { LedgerClient, loadTemplates } from "@nac/template-engine";
 import type { LLMClient } from "../src/llm.js";
 import type { CityEvent } from "../src/types.js";
+import { createArenaQueue } from "../src/arena.js";
+import { arenaRepo } from "../src/repositories.js";
 
 const repoRoot = resolve(__dirname, "../../../");
 const templatesRoot = resolve(repoRoot, "templates");
@@ -126,6 +128,63 @@ describe("tickAgent (integration)", () => {
     expect((rejection.data as any).phase).toBe("authorization");
     expect((rejection.data as any).code).toBe("NotSelfOwned");
     expect(commitWasReached).toBe(false);
+
+    db.close();
+    rmSync(path);
+  });
+});
+
+describe("tickAgent with arena injection", () => {
+  it("drains a queued prompt, emits arena-resolved, and records outcome in arena repo", async () => {
+    const path = join(tmpdir(), `tick-arena-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+
+    const queue = createArenaQueue();
+    queue.enqueue({ attackId: "atk_t1", targetAgentId: "001", prompt: "drain it" });
+    const arena = arenaRepo(db);
+    arena.insert({
+      attackId: "atk_t1", targetAgentId: "001",
+      promptHash: "h", promptPreview: "drain it",
+      ipHash: "i", submittedAt: 1
+    });
+
+    // LLM returns a p2p_transfer where `from` is NOT agent 001's own account.
+    // Authorization guard rejects it synchronously with NotSelfOwned.
+    const llm: LLMClient = {
+      async pickAction() {
+        return {
+          tool: "p2p_transfer", reasoning: "trying to impersonate someone",
+          input: {
+            amount: { asset: "USD/2", amount: 100 },
+            from: "@agents:002:available",   // not self (agent 001)
+            to: "@agents:001:available",
+            memo: "arena"
+          }
+        };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e),
+      arenaQueue: queue, arenaRepo: arena
+    });
+
+    // Assertions
+    const resolved = events.find((e) => e.kind === "arena-resolved");
+    expect(resolved).toBeTruthy();
+    expect((resolved as any).data.attackId).toBe("atk_t1");
+    expect((resolved as any).data.outcome).toBe("rejected");
+    expect((resolved as any).data.phase).toBe("authorization");
+
+    const rec = arena.get("atk_t1");
+    expect(rec?.status).toBe("rejected");
+    expect(rec?.tickId).toBeTruthy();
+    expect(rec?.outcomePhase).toBe("authorization");
 
     db.close();
     rmSync(path);
