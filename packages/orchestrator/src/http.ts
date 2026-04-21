@@ -21,8 +21,14 @@ export interface StartHttpOptions {
   /** Per-process salt for prompt + IP hashing. Must be ≥16 bytes random. */
   arenaSalt?: string;
   arenaRateLimit?: { max: number; windowMs: number };
-  /** Hook invoked after an attack is enqueued so the scheduler can bring the agent's nextTickAt forward. */
-  advanceNextTickFor?: (agentId: string) => void;
+  /** Hook invoked after an attack is enqueued. Receives metadata so callers can
+   * bring the agent's nextTickAt forward AND emit a WS pulse with the real attackId. */
+  advanceNextTickFor?: (args: {
+    agentId: string;
+    attackId: string;
+    promptPreview: string;
+    submittedAt: number;
+  }) => void;
 }
 
 export interface HttpHandle {
@@ -122,7 +128,12 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
         ipHash: ipH, submittedAt
       });
       opts.arenaQueue.enqueue({ attackId, targetAgentId, prompt });
-      opts.advanceNextTickFor?.(targetAgentId);
+      opts.advanceNextTickFor?.({
+        agentId: targetAgentId,
+        attackId,
+        promptPreview: promptPreview(prompt),
+        submittedAt
+      });
 
       return json(res, 202, { attackId, targetAgentId, submittedAt });
     }

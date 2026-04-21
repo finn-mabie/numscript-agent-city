@@ -59,6 +59,7 @@ async function main() {
   const arenaQueue = createArenaQueue();
   const arena = arenaRepo(db);
   const arenaSalt = process.env.ARENA_SALT ?? randomBytes(24).toString("hex");
+  console.error(`[city] arena salt ${process.env.ARENA_SALT ? "env-provided" : "ephemeral (restart will invalidate ip_hash correlations)"}`);
 
   const httpPort = Number(process.env.CITY_HTTP_PORT ?? 3071);
   const http = await startHttp({
@@ -70,9 +71,9 @@ async function main() {
     arenaRepo: arena,
     arenaSalt,
     arenaRateLimit: { max: 5, windowMs: 60_000 },
-    advanceNextTickFor: (agentId) => {
+    advanceNextTickFor: ({ agentId, attackId, promptPreview, submittedAt }) => {
       // Bring the target agent's next tick forward so the attack fires quickly.
-      // If they're already due within 3s, leave it alone.
+      // If they're already due within 2s, leave it alone.
       const a = ag.get(agentId);
       if (!a) return;
       const soon = Date.now() + 2_000;
@@ -80,13 +81,13 @@ async function main() {
       bus.emit({
         kind: "arena-submit",
         agentId,
-        tickId: `arena:pending`,
+        tickId: `arena:${attackId}`,   // synthetic tickId now real attack-id based
         at: Date.now(),
         data: {
-          attackId: "pending",      // real attackId is in the /arena response; UI uses the submit event only for the pulse
+          attackId,
           targetAgentId: agentId,
-          promptPreview: "",
-          submittedAt: Date.now()
+          promptPreview,
+          submittedAt
         }
       });
     }

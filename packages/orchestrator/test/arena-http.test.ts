@@ -161,4 +161,30 @@ describe("POST /arena", () => {
     const body = await res.json();
     expect(body.error).toBe("body too large");
   });
+
+  it("invokes advanceNextTickFor with real attackId, promptPreview, and submittedAt", async () => {
+    const calls: Array<{ agentId: string; attackId: string; promptPreview: string; submittedAt: number }> = [];
+    // Close the default handle from beforeEach so we can install a spy
+    handle.server.close();
+    handle = await startHttp({
+      port: 0, db,
+      getBalance: async () => 0,
+      ledgerGet: async () => ({ ok: true, status: 200, body: {} }),
+      arenaQueue: queue,
+      arenaRepo: repo,
+      arenaSalt: "test-salt",
+      arenaRateLimit: { max: 5, windowMs: 60_000 },
+      advanceNextTickFor: (args) => { calls.push(args); }
+    });
+    const res = await post(handle.port, "/arena",
+      { targetAgentId: "010", prompt: "spy on me" },
+      { "x-forwarded-for": "7.7.7.7" });
+    expect(res.status).toBe(202);
+    const { attackId } = await res.json();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].agentId).toBe("010");
+    expect(calls[0].attackId).toBe(attackId);
+    expect(calls[0].promptPreview).toBe("spy on me");
+    expect(typeof calls[0].submittedAt).toBe("number");
+  });
 });
