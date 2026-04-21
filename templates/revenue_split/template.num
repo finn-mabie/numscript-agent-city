@@ -1,11 +1,22 @@
 vars {
-  account      $pool
-  account_list $recipients
-  monetary     $total = balance($pool, USD/2)
-  string       $round_ref
+  monetary $total
+  account  $pool
+  account  $recipient_a
+  portion  $share_a
+  account  $recipient_b
+  portion  $share_b
+  account  $recipient_c
+  string   $round_ref
 }
 
-distribute($total, $pool, $recipients, USD/2)
+send $total (
+  source      = $pool
+  destination = {
+    $share_a  to $recipient_a
+    $share_b  to $recipient_b
+    remaining to $recipient_c
+  }
+)
 
 set_tx_meta("type",      "REVENUE_SPLIT")
 set_tx_meta("round_ref", $round_ref)

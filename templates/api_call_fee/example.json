@@ -1,4 +1,5 @@
 {
+  "amount":   { "asset": "USD/2", "amount": 20 },
   "caller":   "@agents:002:available",
   "provider": "@agents:005:available",
   "units":    10,

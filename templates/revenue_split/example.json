@@ -1,5 +1,10 @@
 {
-  "pool":       "@platform:pool:yield",
-  "recipients": "agents:*:available",
-  "round_ref":  "yield:2026-04-21"
+  "total":       { "asset": "USD/2", "amount": 30000 },
+  "pool":        "@platform:pool:yield",
+  "recipient_a": "@agents:001:available",
+  "share_a":     "40%",
+  "recipient_b": "@agents:002:available",
+  "share_b":     "30%",
+  "recipient_c": "@agents:003:available",
+  "round_ref":   "yield:2026-04-21"
 }

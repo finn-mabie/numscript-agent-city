@@ -1,12 +1,12 @@
 vars {
+  monetary $amount
   account  $caller
   account  $provider
-  monetary $unit_price = meta($provider, "unit_price")
   number   $units
   string   $call_ref
 }
 
-send mul($unit_price, $units) (
+send $amount (
   source      = $caller
   destination = $provider
 )

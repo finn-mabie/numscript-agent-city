@@ -1,9 +1,14 @@
 {
   "id": "revenue_split",
-  "description": "Distribute a pool's full USD/2 balance to N recipients proportionally to their current balances.",
+  "description": "Distribute a pool balance to three recipients by declared shares. Atomic 3-posting split.",
   "params": {
-    "pool":       { "type": "account", "pattern": "^@platform:pool:[a-zA-Z0-9-]+$" },
-    "recipients": { "type": "account_list",  "pattern": "^[a-zA-Z0-9:*]+$", "description": "Wildcard pattern like 'agents:*:available'" },
-    "round_ref":  { "type": "string",  "maxLength": 64 }
+    "total":       { "type": "monetary", "asset": "USD/2", "max": "100000_00", "min": "1" },
+    "pool":        { "type": "account",  "pattern": "^@platform:pool:[a-zA-Z0-9-]+$" },
+    "recipient_a": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "share_a":     { "type": "portion",  "max": "100%" },
+    "recipient_b": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "share_b":     { "type": "portion",  "max": "100%" },
+    "recipient_c": { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "round_ref":   { "type": "string",   "maxLength": 64 }
   }
 }
