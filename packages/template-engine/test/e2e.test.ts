@@ -25,18 +25,15 @@ beforeAll(async () => {
   // dispute_arbitration examples rely on. Genesis does not seed escrow
   // accounts — they are only populated by runtime escrow_hold calls.
   //
-  // We intentionally over-fund: Formance ledger v2.3.1 persists `?dry_run=true`
-  // transactions, so invoke()'s dry-run + commit pattern drains the source
-  // twice. We size preseeds/top-ups so the second (real) commit still has
-  // funds. Duplicate-reference conflicts are resolved transparently by
-  // LedgerClient.commit via findByReference.
+  // Since Patch 3, invoke() defaults to mode "commit" (single ledger write),
+  // so preseeds are sized to exactly what each template's example drains.
   const prepareClient = new LedgerClient(url, ledger);
 
   const preseeds: Array<[string, string, string, string]> = [
     // [payer, escrow, job_ref, amount-in-cents]
-    ["@agents:003:available", "@escrow:job:gig-002", "gig-002", "800"],  // escrow_release (drains $5 + preseed)
-    ["@agents:003:available", "@escrow:job:gig-003", "gig-003", "800"],  // escrow_refund  (drains whole)
-    ["@agents:003:available", "@escrow:job:gig-004", "gig-004", "1600"]  // dispute_arbitration ($8 funds × 2 for dry-run+commit)
+    ["@agents:003:available", "@escrow:job:gig-002", "gig-002", "500"],  // escrow_release
+    ["@agents:003:available", "@escrow:job:gig-003", "gig-003", "500"],  // escrow_refund
+    ["@agents:003:available", "@escrow:job:gig-004", "gig-004", "800"]   // dispute_arbitration ($8 funds)
   ];
   for (const [payer, escrow, jobRef, cents] of preseeds) {
     const r = await prepareClient.commit({
@@ -67,22 +64,8 @@ set_tx_meta("payer",   $payer)`,
     }
   }
 
-  // Top up platform:pool:yield so revenue_split's example ($300) has room for
-  // the dry-run persistence + real commit. Genesis seeds $500; we add $500
-  // more → $1,000, enough for $300 × 2.
-  const topUp = await prepareClient.commit({
-    plain: `send [USD/2 50000] (
-  source      = @mint:genesis allowing unbounded overdraft
-  destination = @platform:pool:yield
-)
-set_tx_meta("type", "E2E_TOPUP")`,
-    vars: {},
-    reference: "e2e-preseed:pool:yield"
-  });
-  if (!topUp.ok) {
-    // eslint-disable-next-line no-console
-    console.error(`pool:yield top-up failed: ${topUp.code} ${topUp.message}`);
-  }
+  // Genesis already seeds @platform:pool:yield with $500, which is exactly
+  // what revenue_split's example ($300 + 2 recipients split) needs. No top-up.
 }, 120_000);
 
 describe("E2E — every template runs with its example.json on a seeded ledger", () => {
