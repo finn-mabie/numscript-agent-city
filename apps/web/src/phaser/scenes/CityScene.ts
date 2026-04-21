@@ -158,7 +158,7 @@ export class CityScene extends Phaser.Scene {
       { tx:  2, ty:  2, label: "Market",      draw: drawMarket      },
       { tx:  7, ty:  2, label: "Bank",        draw: drawBank        },
       { tx: 12, ty:  2, label: "Post Office", draw: drawPostOffice  },
-      { tx: 17, ty:  2, label: "Inspector",   draw: drawInspector   },
+      { tx: 18, ty:  2, label: "Inspector",   draw: drawInspector   },
       { tx:  5, ty: 10, label: "Pool",        draw: drawPool        },
       { tx: 14, ty: 10, label: "Escrow",      draw: drawEscrow      }
     ];
@@ -187,8 +187,14 @@ const OUTLINE = 0xede8df;
 /** MARKET — open-air stall with striped awning, counter, and crates. */
 function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
   const W = 40, postH = 12;
-  // Sloped awning top (single triangle across full width — no floating crown)
-  s.add.triangle(cx, cy - 9, -W/2, 3, 0, -5, W/2, 3, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  // Sloped awning top — drawn via Graphics with absolute coords so it lands
+  // exactly where we want (Phaser.Triangle re-centers on its bounding box,
+  // which visibly shifts asymmetric triangles up-left).
+  const awning = s.add.graphics();
+  awning.fillStyle(0x5a3a22, 1);
+  awning.fillTriangle(cx - W/2, cy - 6, cx + W/2, cy - 6, cx, cy - 14);
+  awning.lineStyle(1, OUTLINE, 1);
+  awning.strokeTriangle(cx - W/2, cy - 6, cx + W/2, cy - 6, cx, cy - 14);
   // Striped awning band (3 stripes, each on its own rectangle, cleanly stacked)
   const stripes = [0xc69361, 0x9a6b47, 0xc69361];
   for (let i = 0; i < stripes.length; i++) {
@@ -208,8 +214,16 @@ function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
 /** BANK — greek temple: pediment triangle, columns, vault door. */
 function drawBank(s: Phaser.Scene, cx: number, cy: number): void {
   const W = 34, bodyH = 18;
-  // Pediment (top triangle)
-  s.add.triangle(cx, cy - bodyH/2 - 1, -W/2 - 2, 0, 0, -9, W/2 + 2, 0, 0xbfa25d).setStrokeStyle(1, OUTLINE);
+  // Pediment — drawn via Graphics with absolute coords (Phaser.Triangle
+  // re-centers asymmetric geometry, producing the wrong origin).
+  const pedimentBaseY = cy - bodyH/2 - 1;       // sits flush atop the entablature
+  const pedimentHalfW = W/2 + 2;
+  const pedimentPeakY = pedimentBaseY - 9;
+  const ped = s.add.graphics();
+  ped.fillStyle(0xbfa25d, 1);
+  ped.fillTriangle(cx - pedimentHalfW, pedimentBaseY, cx + pedimentHalfW, pedimentBaseY, cx, pedimentPeakY);
+  ped.lineStyle(1, OUTLINE, 1);
+  ped.strokeTriangle(cx - pedimentHalfW, pedimentBaseY, cx + pedimentHalfW, pedimentBaseY, cx, pedimentPeakY);
   // Entablature (thin horizontal band below pediment)
   s.add.rectangle(cx, cy - bodyH/2 + 1, W + 4, 2, 0x544529).setStrokeStyle(1, OUTLINE);
   // Base platform (step below body)

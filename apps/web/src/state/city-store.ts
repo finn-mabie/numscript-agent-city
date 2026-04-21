@@ -55,7 +55,7 @@ const RECENT_CAP = 200;
 const START_POSITIONS: Record<string, [number, number]> = {
   "001": [ 2, 4],   // Alice — Market         (below Market)
   "002": [12, 4],   // Bob — Post Office      (below Post Office)
-  "003": [17, 4],   // Carol — Inspector      (below Inspector)
+  "003": [18, 4],   // Carol — Inspector      (below Inspector)
   "004": [ 7, 4],   // Dave — Bank            (below Bank)
   "005": [ 4, 6],   // Eve — freelance (research)
   "006": [ 9, 6],   // Frank — freelance (writing)
