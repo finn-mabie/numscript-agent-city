@@ -5,6 +5,7 @@ import { emitCoins } from "../coin-flow";
 import { floatPopup, floatPopupClickable } from "../amount-popup";
 import { showBarrier, barrierKindFor } from "../barrier";
 import { incomingPulse, promptBubble, rejectedBanner, reverseCoinTrail, type BubbleHandle } from "../arena-effects";
+import { offerBubble, threadConnector, type OfferBubbleHandle } from "../intent-board-effects";
 import { BUILDINGS } from "../../lib/buildings";
 
 export const TILE = 16;
@@ -29,6 +30,7 @@ export class CityScene extends Phaser.Scene {
   // terminal outcome (committed / rejected / idle) arrives.
   private thinking = new Map<string, Phaser.GameObjects.GameObject[]>();
   private arenaBubbles = new Map<string, BubbleHandle>();
+  private offerBubbles = new Map<string, OfferBubbleHandle>();
 
   create() {
     this.cameras.main.setBackgroundColor("#1a2f1a");
@@ -69,6 +71,35 @@ export class CityScene extends Phaser.Scene {
           if (!Object.values(s.arenaActive).some((a) => a.attackId === oldAttack.attackId)) {
             this.arenaBubbles.get(oldAttack.attackId)?.destroy();
             this.arenaBubbles.delete(oldAttack.attackId);
+          }
+        }
+      }
+
+      // Offer bubbles — fire when a new offer appears in the store
+      for (const [id, o] of Object.entries(s.offers)) {
+        const wasKnown = prev?.offers[id] !== undefined;
+        if (wasKnown) continue;
+        if (o.status !== "open") continue;
+        const sprite = this.agents.get(o.authorAgentId);
+        if (!sprite) continue;
+        const kind: "root" | "reply" = o.inReplyTo ? "reply" : "root";
+        const b = offerBubble(this, sprite.worldX(), sprite.worldY() - 4, o.text, kind);
+        this.offerBubbles.set(o.id, b);
+        // Thread connector: if reply, draw line from replier to parent author
+        if (o.inReplyTo) {
+          const parent = s.offers[o.inReplyTo];
+          const parentSprite = parent ? this.agents.get(parent.authorAgentId) : undefined;
+          if (parentSprite) {
+            threadConnector(this, sprite.worldX(), sprite.worldY(), parentSprite.worldX(), parentSprite.worldY());
+          }
+        }
+      }
+      // Clean up bubbles for offers that left the store (rare — bubbles usually self-fade via timer)
+      if (prev) {
+        for (const id of Object.keys(prev.offers)) {
+          if (!s.offers[id]) {
+            this.offerBubbles.get(id)?.destroy();
+            this.offerBubbles.delete(id);
           }
         }
       }
