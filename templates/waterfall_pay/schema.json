@@ -1,0 +1,12 @@
+{
+  "id": "waterfall_pay",
+  "description": "Pay from an agent's buckets in priority order: promo credits → earnings → main balance.",
+  "params": {
+    "amount":          { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
+    "agent_credits":   { "type": "account",  "pattern": "^@agents:[0-9]+:credits$" },
+    "agent_earnings":  { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "agent_main":      { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "to":              { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "memo":            { "type": "string",   "maxLength": 140 }
+  }
+}

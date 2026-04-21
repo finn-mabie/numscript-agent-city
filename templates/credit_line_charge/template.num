@@ -1,0 +1,19 @@
+vars {
+  monetary $amount
+  account  $agent_credit
+  monetary $credit_limit
+  account  $agent_main
+  account  $to
+  string   $memo
+}
+
+send $amount (
+  source      = {
+    $agent_credit allowing overdraft up to $credit_limit
+    $agent_main
+  }
+  destination = $to
+)
+
+set_tx_meta("type", "CREDIT_LINE_CHARGE")
+set_tx_meta("memo", $memo)

@@ -1,0 +1,8 @@
+{
+  "amount":       { "asset": "USD/2", "amount": 300 },
+  "agent_credit": "@agents:002:credit",
+  "credit_limit": { "asset": "USD/2", "amount": 10000 },
+  "agent_main":   "@agents:002:available",
+  "to":           "@agents:005:available",
+  "memo":         "research bundle"
+}

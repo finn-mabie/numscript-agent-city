@@ -1,0 +1,9 @@
+{
+  "id": "liquidate_wallet",
+  "description": "Drain an agent's full USD/2 balance to a target. Used for bankruptcy or role change.",
+  "params": {
+    "from":   { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "to":     { "type": "account", "pattern": "^@agents:[0-9]+:available$" },
+    "reason": { "type": "string",  "maxLength": 140 }
+  }
+}

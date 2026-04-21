@@ -1,0 +1,5 @@
+{
+  "from":   "@agents:009:available",
+  "to":     "@agents:001:available",
+  "reason": "role retired"
+}

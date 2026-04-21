@@ -1,0 +1,14 @@
+vars {
+  account $from
+  account $to
+  string  $reason
+}
+
+send [USD/2 *] (
+  source      = $from
+  destination = $to
+)
+
+set_tx_meta("type",   "LIQUIDATE_WALLET")
+set_tx_meta("from",   $from)
+set_tx_meta("reason", $reason)

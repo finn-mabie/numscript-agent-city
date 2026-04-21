@@ -1,0 +1,8 @@
+{
+  "amount":         { "asset": "USD/2", "amount": 300 },
+  "agent_credits":  "@agents:002:credits",
+  "agent_earnings": "@agents:002:available",
+  "agent_main":     "@agents:002:available",
+  "to":             "@agents:005:available",
+  "memo":           "api bundle"
+}
