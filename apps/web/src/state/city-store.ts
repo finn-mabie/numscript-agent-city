@@ -25,6 +25,7 @@ export interface IntentLogView {
   errorPhase: string | null;
   errorCode: string | null;
   txId: string | null;
+  attackId: string | null;
   createdAt: number;
 }
 
@@ -140,6 +141,7 @@ export const useCityStore = create<CityState>((set) => ({
           errorPhase: e.kind === "rejected" ? (e as any).data?.phase ?? null : null,
           errorCode:  e.kind === "rejected" ? (e as any).data?.code  ?? null : null,
           txId:       e.kind === "committed" ? (e as any).data?.txId ?? null : null,
+          attackId:   (e as any).data?.attackId ?? existing?.attackId ?? null,
           createdAt:  existing?.createdAt ?? e.at
         };
         // Remove any existing entry with this tickId, then prepend the fresh one.

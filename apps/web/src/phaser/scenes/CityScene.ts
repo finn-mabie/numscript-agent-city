@@ -4,6 +4,7 @@ import { AgentSprite } from "../agent-sprite";
 import { emitCoins } from "../coin-flow";
 import { floatPopup, floatPopupClickable } from "../amount-popup";
 import { showBarrier, type BarrierKind } from "../barrier";
+import { incomingPulse, promptBubble, rejectedBanner, reverseCoinTrail, type BubbleHandle } from "../arena-effects";
 
 export const TILE = 16;
 export const GRID_W = 20;
@@ -26,6 +27,7 @@ export class CityScene extends Phaser.Scene {
   // Thought bubbles for pending intents, keyed by tickId. Cleared when the
   // terminal outcome (committed / rejected / idle) arrives.
   private thinking = new Map<string, Phaser.GameObjects.GameObject[]>();
+  private arenaBubbles = new Map<string, BubbleHandle>();
 
   create() {
     this.cameras.main.setBackgroundColor("#1a2f1a");
@@ -49,6 +51,26 @@ export class CityScene extends Phaser.Scene {
         if (prior?.outcome === r.outcome) continue;
         this.animateForEntry(r, prior?.outcome);
       }
+
+      // Arena incoming pulse — fires when a new attack appears in arenaActive.
+      for (const [targetAgentId, attack] of Object.entries(s.arenaActive)) {
+        const wasActive = prev?.arenaActive[targetAgentId]?.attackId === attack.attackId;
+        if (wasActive) continue;
+        const sprite = this.agents.get(targetAgentId);
+        if (!sprite) continue;
+        incomingPulse(this, sprite.worldX(), sprite.worldY());
+        const b = promptBubble(this, sprite.worldX(), sprite.worldY() - 4, attack.promptPreview);
+        this.arenaBubbles.set(attack.attackId, b);
+      }
+      // Clean up bubbles whose attack left arenaActive (tick resolved).
+      if (prev) {
+        for (const [, oldAttack] of Object.entries(prev.arenaActive)) {
+          if (!Object.values(s.arenaActive).some((a) => a.attackId === oldAttack.attackId)) {
+            this.arenaBubbles.get(oldAttack.attackId)?.destroy();
+            this.arenaBubbles.delete(oldAttack.attackId);
+          }
+        }
+      }
     });
   }
 
@@ -57,7 +79,7 @@ export class CityScene extends Phaser.Scene {
   }
 
   private animateForEntry(
-    r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null },
+    r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null; attackId: string | null },
     priorOutcome?: string
   ): void {
     const src = this.agents.get(r.agentId);
@@ -92,6 +114,14 @@ export class CityScene extends Phaser.Scene {
         r.errorPhase === "commit"        ? "commit" :
         r.errorPhase === "load"          ? "load" : "other";
       showBarrier(this, src.worldX(), src.worldY(), kind, r.errorCode ?? "REJECTED");
+      // Arena attack → dramatic banner + reverse coin trail
+      if (r.attackId) {
+        const bannerY = src.worldY() - 22;
+        rejectedBanner(this, src.worldX(), bannerY);
+        const peerId = this.counterpartyFromParams(r.params);
+        const dst = peerId ? this.agents.get(peerId) : undefined;
+        if (dst) reverseCoinTrail(this, dst.worldX(), dst.worldY(), src.worldX(), src.worldY());
+      }
     }
     // outcome "idle" produces no visual (bubble was already cleared above)
   }
