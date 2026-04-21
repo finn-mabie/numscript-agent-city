@@ -1,7 +1,6 @@
 vars {
   monetary $amount
   account  $agent_credits
-  account  $agent_earnings
   account  $agent_main
   account  $to
   string   $memo
@@ -10,7 +9,6 @@ vars {
 send $amount (
   source      = {
     $agent_credits
-    $agent_earnings
     $agent_main
   }
   destination = $to

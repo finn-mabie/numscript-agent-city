@@ -32,9 +32,8 @@ describe("renderVars", () => {
     });
   });
 
-  it("renders account_list as accounts(\"pattern\")", () => {
-    const s: TemplateSchema = { id: "t", description: "t", params: { list: { type: "account_list" } } };
-    const v = renderVars(s, { list: "agents:*:available" });
-    expect(v).toEqual({ list: 'accounts("agents:*:available")' });
+  it("throws when an account param is missing its leading @", () => {
+    const s: TemplateSchema = { id: "t", description: "t", params: { a: { type: "account" } } };
+    expect(() => renderVars(s, { a: "agents:001:available" })).toThrow(/leading "@"/);
   });
 });

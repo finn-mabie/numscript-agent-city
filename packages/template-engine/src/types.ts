@@ -9,7 +9,6 @@ export interface TemplateSchema {
 export type ParamSpec =
   | { type: "monetary"; asset?: string; max?: string; min?: string; description?: string }
   | { type: "account"; pattern?: string; const?: string; description?: string }
-  | { type: "account_list"; pattern?: string; description?: string }
   | { type: "portion"; max?: string; min?: string; description?: string }
   | { type: "string"; pattern?: string; maxLength?: number; description?: string }
   | { type: "number"; minimum?: number; maximum?: number; description?: string };

@@ -20,14 +20,12 @@ export function renderVars(
         break;
       }
       case "account": {
+        // Canonical input form is "@agents:001:available". Strip @ for the ledger wire.
         const s = v as string;
-        vars[name] = s.startsWith("@") ? s.slice(1) : s;
-        break;
-      }
-      case "account_list": {
-        // Numscript expects: accounts("agents:*:available")
-        const s = v as string;
-        vars[name] = `accounts("${s}")`;
+        if (!s.startsWith("@")) {
+          throw new Error(`Account param ${name} must have a leading "@": got "${s}"`);
+        }
+        vars[name] = s.slice(1);
         break;
       }
       case "portion":

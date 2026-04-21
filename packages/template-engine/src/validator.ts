@@ -49,17 +49,12 @@ export function validateParams(
         if (typeof v !== "string") {
           return { ok: false, error: err("TypeMismatch", `${name} must be string (account address)`) };
         }
+        // Canonical form: must start with "@". Renderer strips it for the wire.
+        if (!v.startsWith("@")) {
+          return { ok: false, error: err("PatternMismatch", `${name} must start with "@": got "${v}"`) };
+        }
         if (spec.const !== undefined && v !== spec.const) {
           return { ok: false, error: err("ConstMismatch", `${name} must equal ${spec.const}`) };
-        }
-        if (spec.pattern !== undefined && !new RegExp(spec.pattern).test(v)) {
-          return { ok: false, error: err("PatternMismatch", `${name} does not match pattern ${spec.pattern}`) };
-        }
-        break;
-      }
-      case "account_list": {
-        if (typeof v !== "string") {
-          return { ok: false, error: err("TypeMismatch", `${name} must be string (wildcard pattern)`) };
         }
         if (spec.pattern !== undefined && !new RegExp(spec.pattern).test(v)) {
           return { ok: false, error: err("PatternMismatch", `${name} does not match pattern ${spec.pattern}`) };
