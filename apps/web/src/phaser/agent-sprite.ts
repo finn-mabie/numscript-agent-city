@@ -20,6 +20,17 @@ export class AgentSprite {
       color: "#e8e8e6"
     }).setOrigin(0.5, 1);
 
+    this.sprite.setInteractive({ useHandCursor: true });
+    this.sprite.on("pointerover", () => {
+      window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: { id: agent.id, x: this.px() * 3, y: this.py() * 3 } }));
+    });
+    this.sprite.on("pointerout", () => {
+      window.dispatchEvent(new CustomEvent("nac:agent-hover", { detail: null }));
+    });
+    this.sprite.on("pointerdown", () => {
+      window.dispatchEvent(new CustomEvent("nac:agent-click", { detail: { id: agent.id } }));
+    });
+
     scene.time.addEvent({
       delay: Phaser.Math.Between(1200, 2200),
       loop: true,
