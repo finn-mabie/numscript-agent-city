@@ -1,6 +1,7 @@
 export * from "./types.js";
 export { openDb, runMigrations } from "./db.js";
-export { agentRepo, relationshipsRepo, intentLogRepo } from "./repositories.js";
+export { agentRepo, relationshipsRepo, intentLogRepo, offerRepo } from "./repositories.js";
+export type { OfferRecord } from "./repositories.js";
 export { ROSTER, JUDY_ID, isJudy } from "./roster.js";
 export { toolsForTemplates, IDLE_TOOL } from "./tool-schema.js";
 export type { AnthropicTool } from "./tool-schema.js";
@@ -23,3 +24,4 @@ export { arenaRepo } from "./repositories.js";
 export type { ArenaAttackRecord } from "./repositories.js";
 export { createRateLimiter } from "./rate-limit.js";
 export type { RateLimiter, RateLimiterOptions, RateLimitResult } from "./rate-limit.js";
+export { newOfferId, validateOfferText, POST_OFFER_TOOL, OFFER_ID_RE } from "./offers.js";
