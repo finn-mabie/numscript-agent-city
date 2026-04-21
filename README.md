@@ -105,8 +105,36 @@ Judy's job is to continuously attempt edge cases. Every rejection feeds the same
 - `pnpm city:start` runs for 2 minutes with ≥ 3 tick-starts and ≥ 1 committed, no crashes
 - `pnpm city:watch` connects and receives events
 
-## Not yet (coming in Plans 3–4)
+### Plan 3
+- `pnpm --filter @nac/web build` succeeds with no TypeScript errors
+- `pnpm --filter @nac/web lint` clean (tsc --noEmit)
+- `pnpm --filter @nac/orchestrator test` — 41 tests pass, /snapshot included
+- Manual visual smoke: open http://localhost:3000 while `DEMO_MODE=1 pnpm city:start` runs — 10 pixel sprites visible, at least one coin-flow or barrier event within 60s, hover + click panels work, browser console clean
 
-- **Pixel city visualization** — the watchable Smallville-style frontend.
-- **Arena** — prompt injection playground where visitors try to break the cage.
-- **Share flow** — webm captures of rejected attacks, OG cards for permalinks.
+## Plan 3 — Visual City
+
+The pixel village.
+
+    export ANTHROPIC_API_KEY=sk-ant-...
+    pnpm ledger:up
+    pnpm seed-genesis
+    pnpm --filter @nac/template-engine build
+    pnpm --filter @nac/orchestrator build
+    DEMO_MODE=1 pnpm city:start     # terminal A — 20-40s ticks instead of 7-13min
+    pnpm web:dev                    # terminal B — http://localhost:3000
+
+Open http://localhost:3000. Ten colored agent sprites walk a 20×12 tile-mapped town. When an agent commits, **gold coin-flow particles** trail between it and its counterparty, plus a `✓ template_id` popup you can click to inspect. When a rejection fires, a **color-coded barrier** flashes — vermillion for authorization (the cross-agent-theft guard), blue for schema validate, deep red for ledger commit, gray for other. The HUD top-bar ticks live: in-circulation $, ticks today, rejected today (pulses vermillion on increment), uptime.
+
+Hover an agent → a small card with name / role / tagline / balance. Click an agent → right-side panel with the full intent log. Click a commit popup → left-side panel with the committed tx's params + outcome.
+
+### What Plan 3 added on top of Plan 2
+
+- **`apps/web/`** — Next.js 15 / React 19 / Phaser 3 / Zustand / Tailwind. Pixel-art (Kenney Tiny Town + Tiny Dungeon, both CC0) with per-agent tinting.
+- **`packages/orchestrator/src/http.ts`** — HTTP `GET /snapshot` on port 3071 serves initial state so a fresh page renders immediately without waiting for the next tick.
+- **`DEMO_MODE=1`** — shortens tick interval to 20-40s (default stays 7-13min for production).
+- **Design system** — custom CSS tokens (warm neutrals, vermillion reserved for rejections), JetBrains Mono everywhere, no sans-serif, no default blue, no gradients.
+
+## Not yet (coming in Plan 4)
+
+- **Arena** — prompt-injection playground. Visitors submit hostile prompts; the city animates the attack and the cage catches it.
+- **Share flow** — webm captures of rejected attacks, OG cards for permalinks, a leaderboard of creative-but-blocked attempts.
