@@ -1,0 +1,5 @@
+{
+  "escrow":  "@escrow:job:gig-003",
+  "payer":   "@agents:003:available",
+  "job_ref": "gig-003"
+}

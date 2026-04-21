@@ -1,0 +1,10 @@
+{
+  "id": "escrow_hold",
+  "description": "Lock payer's funds in a per-job escrow account. Idempotent via `reference`.",
+  "params": {
+    "amount":  { "type": "monetary", "asset": "USD/2", "max": "1000_00", "min": "1" },
+    "payer":   { "type": "account",  "pattern": "^@agents:[0-9]+:available$" },
+    "escrow":  { "type": "account",  "pattern": "^@escrow:job:[a-zA-Z0-9-]+$" },
+    "job_ref": { "type": "string",   "maxLength": 64 }
+  }
+}

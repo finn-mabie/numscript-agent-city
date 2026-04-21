@@ -1,0 +1,6 @@
+{
+  "amount":  { "asset": "USD/2", "amount": 500 },
+  "payer":   "@agents:003:available",
+  "escrow":  "@escrow:job:gig-002",
+  "job_ref": "gig-002"
+}

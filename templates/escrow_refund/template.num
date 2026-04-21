@@ -1,0 +1,14 @@
+vars {
+  account $escrow
+  account $payer
+  string  $job_ref
+}
+
+send [USD/2 *] (
+  source      = $escrow
+  destination = $payer
+)
+
+set_tx_meta("type",    "ESCROW_REFUND")
+set_tx_meta("job_ref", $job_ref)
+set_tx_meta("payer",   $payer)

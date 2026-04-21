@@ -1,0 +1,14 @@
+vars {
+  account $escrow
+  account $winner
+  string  $job_ref
+}
+
+send [USD/2 *] (
+  source      = $escrow
+  destination = $winner
+)
+
+set_tx_meta("type",    "ESCROW_RELEASE")
+set_tx_meta("job_ref", $job_ref)
+set_tx_meta("winner",  $winner)

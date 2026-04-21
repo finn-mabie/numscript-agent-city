@@ -1,0 +1,15 @@
+vars {
+  monetary $amount
+  account  $payer
+  account  $escrow
+  string   $job_ref
+}
+
+send $amount (
+  source      = $payer
+  destination = $escrow
+)
+
+set_tx_meta("type",    "ESCROW_HOLD")
+set_tx_meta("job_ref", $job_ref)
+set_tx_meta("payer",   $payer)
