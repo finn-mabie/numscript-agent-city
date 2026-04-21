@@ -107,7 +107,7 @@ export class CityScene extends Phaser.Scene {
       color: "#ede8df",
       backgroundColor: "#3a3732",
       padding: { left: 4, right: 4, top: 2, bottom: 2 }
-    }).setOrigin(0.5, 1).setAlpha(0).setResolution(3);
+    }).setOrigin(0.5, 1).setAlpha(0).setResolution(4);
     this.tweens.add({ targets: label, alpha: 1, duration: 180, ease: "cubic.out" });
     this.thinking.set(tickId, [label]);
     // Safety timeout — clear if no terminal event arrives in 8s.
@@ -169,10 +169,10 @@ export class CityScene extends Phaser.Scene {
       d.draw(this, cx, cy);
       this.add.text(cx, cy - TILE * 1.6, d.label, {
         fontFamily: "ui-monospace, monospace",
-        fontSize: "10px",
+        fontSize: "13px",
         color: "#ede8df",
-        fontStyle: "600"
-      }).setOrigin(0.5, 1).setResolution(3);
+        fontStyle: "700"
+      }).setOrigin(0.5, 1).setResolution(4);
     }
   }
 }
@@ -186,23 +186,23 @@ const OUTLINE = 0xede8df;
 
 /** MARKET — open-air stall with striped awning, counter, and crates. */
 function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
-  const W = 40, stallH = 14, postH = 10;
-  // Striped awning (trapezoid-like: 3 colored bands stacked)
+  const W = 40, postH = 12;
+  // Sloped awning top (single triangle across full width — no floating crown)
+  s.add.triangle(cx, cy - 9, -W/2, 3, 0, -5, W/2, 3, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  // Striped awning band (3 stripes, each on its own rectangle, cleanly stacked)
   const stripes = [0xc69361, 0x9a6b47, 0xc69361];
   for (let i = 0; i < stripes.length; i++) {
-    s.add.rectangle(cx, cy - 12 + i * 3, W, 3, stripes[i]).setStrokeStyle(1, OUTLINE);
+    s.add.rectangle(cx, cy - 4 + i * 3, W, 3, stripes[i]).setStrokeStyle(1, OUTLINE);
   }
-  // Awning top edge (slight crown)
-  s.add.triangle(cx, cy - 14, -W/2 + 2, 0, 0, -4, W/2 - 2, 0, 0x5a3a22).setStrokeStyle(1, OUTLINE);
-  // Counter (horizontal slab)
-  s.add.rectangle(cx, cy + 6, W - 4, 4, 0x7a5c42).setStrokeStyle(1, OUTLINE);
-  // 2 support posts
-  s.add.rectangle(cx - W/2 + 3, cy - 2, 2, postH, 0x4f3c2b);
-  s.add.rectangle(cx + W/2 - 3, cy - 2, 2, postH, 0x4f3c2b);
+  // 2 support posts, anchored to the awning bottom and counter top
+  s.add.rectangle(cx - W/2 + 3, cy + 3, 2, postH, 0x4f3c2b).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx + W/2 - 3, cy + 3, 2, postH, 0x4f3c2b).setStrokeStyle(1, OUTLINE);
+  // Counter (horizontal slab at bottom)
+  s.add.rectangle(cx, cy + 9, W - 4, 4, 0x7a5c42).setStrokeStyle(1, OUTLINE);
   // Crates on the counter
-  s.add.rectangle(cx - 8, cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
-  s.add.rectangle(cx,      cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
-  s.add.rectangle(cx + 8, cy + 3, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx - 8, cy + 6, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx,      cy + 6, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  s.add.rectangle(cx + 8, cy + 6, 5, 5, 0x5a3a22).setStrokeStyle(1, OUTLINE);
 }
 
 /** BANK — greek temple: pediment triangle, columns, vault door. */
@@ -221,13 +221,12 @@ function drawBank(s: Phaser.Scene, cx: number, cy: number): void {
   }
   // Vault door in the center (dark circle behind columns)
   s.add.circle(cx, colY + 1, 4, 0x1f1a16).setStrokeStyle(1, OUTLINE);
-  // Dollar sign on the pediment (tiny "$" made from a rect + arcs is hard; use text)
-  s.add.text(cx, cy - bodyH/2 - 3, "$", {
-    fontFamily: "ui-monospace, monospace",
-    fontSize: "8px",
-    color: "#5a3a22",
-    fontStyle: "700"
-  }).setOrigin(0.5, 0.5).setResolution(3);
+  // Geometric "$" on the pediment: vertical bar + two short crossbars
+  const dollarX = cx;
+  const dollarY = cy - bodyH/2 - 4;
+  s.add.rectangle(dollarX, dollarY,     1.5, 6, 0x3a2a10);  // vertical stroke
+  s.add.rectangle(dollarX, dollarY - 2, 4,   1, 0x3a2a10);  // top bar
+  s.add.rectangle(dollarX, dollarY + 2, 4,   1, 0x3a2a10);  // bottom bar
 }
 
 /** POST OFFICE — utility building with a mailbox slot, door, and sign. */
@@ -254,31 +253,26 @@ function drawPostOffice(s: Phaser.Scene, cx: number, cy: number): void {
   s.add.rectangle(cx - W * 0.08, cy + bodyH * 0.25, 5, bodyH * 0.4, 0x1f1a16).setStrokeStyle(1, 0x7b8d9a);
 }
 
-/** INSPECTOR — small kiosk with a magnifying glass symbol and counter window. */
+/** INSPECTOR — kiosk with a full-width flat-top roof, magnifying glass + clipboard. */
 function drawInspector(s: Phaser.Scene, cx: number, cy: number): void {
   const W = 34, bodyH = 22;
   // Body (olive)
   s.add.rectangle(cx, cy, W, bodyH, 0x64714e).setStrokeStyle(1, OUTLINE);
-  // Sloped roof (one side higher — gives a kiosk/booth feel)
-  s.add.triangle(
-    cx, cy - bodyH/2,
-    -W/2 - 1, 0,
-    -W/2 + 4, -8,
-    W/2 + 1, 0,
-    0x37412a
-  ).setStrokeStyle(1, OUTLINE);
+  // Overhanging flat roof (slab wider than body)
+  s.add.rectangle(cx, cy - bodyH/2 - 2, W + 6, 4, 0x37412a).setStrokeStyle(1, OUTLINE);
+  // Thin trim line below the roof
+  s.add.rectangle(cx, cy - bodyH/2 + 1, W, 1, 0x3a4128);
   // Counter window (wide, glazed)
   s.add.rectangle(cx, cy - 2, W - 8, 7, 0xc9ceb7).setStrokeStyle(1, 0x3a4128);
   // Counter shelf below window
   s.add.rectangle(cx, cy + 3, W - 6, 2, 0x3a4128);
-  // Magnifying glass icon (circle + handle line) on the side
+  // Magnifying glass icon on the right side of the counter
   const mgX = cx + W * 0.3;
   const mgY = cy + bodyH * 0.22;
   s.add.circle(mgX, mgY, 3, 0x3a4128).setStrokeStyle(1, 0xede8df);
   s.add.circle(mgX, mgY, 2, 0xc9ceb7);
-  // Handle
   s.add.rectangle(mgX + 3, mgY + 3, 4, 1.2, 0x3a4128);
-  // Clipboard icon on the other side
+  // Clipboard icon on the left side of the counter
   s.add.rectangle(cx - W * 0.32, cy + bodyH * 0.22, 5, 6, 0xede8df).setStrokeStyle(1, 0x3a4128);
   s.add.rectangle(cx - W * 0.32, cy + bodyH * 0.22 - 2.5, 2.5, 1, 0x3a4128);
 }

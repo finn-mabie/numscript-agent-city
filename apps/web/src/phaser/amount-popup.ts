@@ -11,7 +11,7 @@ export function floatPopup(
     fontSize: "11px",
     color,
     fontStyle: "bold"
-  }).setOrigin(0.5, 1).setResolution(3);
+  }).setOrigin(0.5, 1).setResolution(4);
 
   scene.tweens.add({
     targets: t,
@@ -36,7 +36,7 @@ export function floatPopupClickable(
     fontSize: "11px",
     color,
     fontStyle: "bold"
-  }).setOrigin(0.5, 1).setResolution(3);
+  }).setOrigin(0.5, 1).setResolution(4);
   t.setInteractive({ useHandCursor: true }).on("pointerdown", onClick);
 
   scene.tweens.add({

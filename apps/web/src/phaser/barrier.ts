@@ -28,7 +28,7 @@ export function showBarrier(scene: Phaser.Scene, x: number, y: number, kind: Bar
     fontSize: "10px",
     color: "#ec3a2d",
     fontStyle: "bold"
-  }).setOrigin(0.5, 0).setResolution(3);
+  }).setOrigin(0.5, 0).setResolution(4);
   scene.tweens.add({
     targets: label,
     y: y + 24,

@@ -23,11 +23,14 @@ export class AgentSprite {
     this.sprite = scene.add.sprite(this.px(), this.py(), "chars", 84) // char frame 84 = default humanoid
       .setDisplaySize(TILE, TILE)
       .setTint(this.hexToNumber(agent.color));
-    this.label = scene.add.text(this.px(), this.py() - TILE * 0.75, agent.name, {
+    this.label = scene.add.text(this.px(), this.py() - TILE * 0.85, agent.name, {
       fontFamily: "ui-monospace, monospace",
-      fontSize: "9px",
-      color: "#ede8df"
-    }).setOrigin(0.5, 1).setResolution(3);
+      fontSize: "12px",
+      color: "#ede8df",
+      fontStyle: "600",
+      stroke: "#0a0908",
+      strokeThickness: 3
+    }).setOrigin(0.5, 1).setResolution(4);
 
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on("pointerover", (pointer: Phaser.Input.Pointer) => {
