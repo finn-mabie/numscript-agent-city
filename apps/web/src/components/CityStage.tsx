@@ -10,6 +10,7 @@ import AgentCard from "./AgentCard";
 import AgentPanel from "./AgentPanel";
 import TxPanel from "./TxPanel";
 import ActivityTicker from "./ActivityTicker";
+import { ArenaBar } from "./ArenaBar";
 
 type ConnStatus = "connecting" | "live" | "quiet" | "error";
 
@@ -57,6 +58,7 @@ export default function CityStage() {
       <AgentPanel />
       <TxPanel />
       <ActivityTicker />
+      <ArenaBar />
       {status === "connecting" && (
         <Overlay>Connecting to the city…</Overlay>
       )}
