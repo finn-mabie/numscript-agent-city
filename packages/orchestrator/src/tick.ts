@@ -2,6 +2,7 @@ import { invoke, LedgerClient } from "@nac/template-engine";
 import type { Template, ParamValue } from "@nac/template-engine";
 import type Database from "better-sqlite3";
 import { agentRepo, relationshipsRepo, intentLogRepo } from "./repositories.js";
+import type { offerRepo as offerRepoFactory } from "./repositories.js";
 import { buildContext } from "./context-builder.js";
 import { toolsForTemplates } from "./tool-schema.js";
 import { shouldEnterHustle, shouldExitHustle, HUSTLE_THRESHOLD_CENTS } from "./hustle-mode.js";
@@ -10,7 +11,10 @@ import type { AgentRecord, CityEvent, TickOutcome } from "./types.js";
 import type { LLMClient } from "./llm.js";
 import type { ArenaQueue, QueuedAttack } from "./arena.js";
 import type { arenaRepo } from "./repositories.js";
+import { validateOfferText, newOfferId, OFFER_ID_RE } from "./offers.js";
+import { AGENT_TEMPLATE_MAP } from "./agent-templates-map.js";
 type ArenaRepo = ReturnType<typeof arenaRepo>;
+type OfferRepoT = ReturnType<typeof offerRepoFactory>;
 
 export interface TickDeps {
   db: Database.Database;
@@ -24,6 +28,10 @@ export interface TickDeps {
   arenaQueue?: ArenaQueue;
   /** Optional — when set, arena attack outcomes are persisted here. */
   arenaRepo?: ArenaRepo;
+  /** Board state: when set, board context flows into buildContext and post_offer actions persist here. */
+  offerRepo?: OfferRepoT;
+  /** Called on every valid post_offer. run-city advances up to 3 peers from templateOverlapPeers. */
+  advancePeersOnOffer?: (args: { authorAgentId: string; offerId: string; templateOverlapPeers: string[] }) => void;
 }
 
 // Tick intervals are env-configurable so demo/visual-testing can shorten
@@ -135,7 +143,12 @@ export async function tickAgent(
     const topRel = rels.top(agent.id, 5);
     const bottomRel = rels.bottom(agent.id, 3);
     const recent = log.recent(agent.id, 5);
-    const { system, user } = buildContext({ agent, peers: allAgents, balances, topRel, bottomRel, recent, arenaInjection: queued?.prompt });
+    const board = deps.offerRepo?.openOffers(8, agent.id) ?? [];
+    const { system, user } = buildContext({
+      agent, peers: allAgents, balances, topRel, bottomRel, recent,
+      arenaInjection: queued?.prompt,
+      board
+    });
 
     deps.emit({ kind: "tick-start", agentId: agent.id, tickId, at: Date.now(),
       ...(queued ? { data: { attackId: queued.attackId } } : {}) });
@@ -150,6 +163,68 @@ export async function tickAgent(
       data: { tool: action.tool, input: action.input, reasoning: action.reasoning,
               ...(queued ? { attackId: queued.attackId } : {}) }
     });
+
+    // ── post_offer branch (Intent Board) ────────────────────────────────
+    if (action.tool === "post_offer") {
+      const rawText = String((action.input as any)?.text ?? "");
+      const rawReply = (action.input as any)?.in_reply_to;
+      const text = validateOfferText(rawText);
+      if (!text || !deps.offerRepo) {
+        // Invalid text or no board wired → treat as idle
+        log.insert({
+          agentId: agent.id, tickId, reasoning: action.reasoning,
+          templateId: "post_offer", params: action.input as Record<string, ParamValue>,
+          outcome: "idle",
+          errorPhase: text ? null : "validate",
+          errorCode: text ? null : "InvalidOfferText",
+          txId: null, createdAt: Date.now()
+        });
+        ag.updateNextTick(agent.id, nextTickAt(Date.now()));
+        deps.emit({ kind: "idle", agentId: agent.id, tickId, at: Date.now() });
+        return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, idle: true } };
+      }
+
+      // Validate in_reply_to if present
+      let inReplyTo: string | null = null;
+      if (typeof rawReply === "string" && OFFER_ID_RE.test(rawReply)) {
+        const parent = deps.offerRepo.get(rawReply);
+        if (parent && parent.status === "open") inReplyTo = rawReply;
+      }
+
+      const offerId = newOfferId();
+      const createdAt = Date.now();
+      const expiresAt = createdAt + 5 * 60_000;
+      deps.offerRepo.insert({
+        id: offerId, authorAgentId: agent.id, text,
+        inReplyTo, createdAt, expiresAt
+      });
+
+      log.insert({
+        agentId: agent.id, tickId, reasoning: action.reasoning,
+        templateId: "post_offer",
+        params: { text, in_reply_to: inReplyTo, offer_id: offerId } as Record<string, ParamValue>,
+        outcome: "committed",
+        errorPhase: null, errorCode: null, txId: null, createdAt
+      });
+
+      deps.emit({
+        kind: "offer-posted", agentId: agent.id, tickId, at: createdAt,
+        data: { offerId, authorAgentId: agent.id, text, inReplyTo, expiresAt }
+      });
+
+      // Ask run-city to wake relevant peers (template overlap computed here)
+      if (deps.advancePeersOnOffer) {
+        const mine = AGENT_TEMPLATE_MAP[agent.id] ?? [];
+        const peers = allAgents
+          .filter((p) => p.id !== agent.id)
+          .filter((p) => (AGENT_TEMPLATE_MAP[p.id] ?? []).some((t) => mine.includes(t)))
+          .map((p) => p.id);
+        deps.advancePeersOnOffer({ authorAgentId: agent.id, offerId, templateOverlapPeers: peers });
+      }
+
+      ag.updateNextTick(agent.id, nextTickAt(Date.now()));
+      return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, postOffer: true, offerId } };
+    }
 
     // Idle short-circuit
     if (action.tool === "idle") {
@@ -251,6 +326,34 @@ export async function tickAgent(
       outcome: finalStatus, status: finalStatus,
       phase: finalPhase, code: finalCode
     });
+
+    // Close any open offer referenced in the committed tx's memo.
+    if (deps.offerRepo && result.ok && result.committed?.id) {
+      const memo = typeof (params as any).memo === "string" ? (params as any).memo : "";
+      const m = memo.match(/\boff_[a-z0-9]+_[a-f0-9]{4}\b/);
+      if (m) {
+        const offerIdInMemo = m[0];
+        const offer = deps.offerRepo.get(offerIdInMemo);
+        if (offer && offer.status === "open" && offer.authorAgentId !== agent.id) {
+          const closedAt = Date.now();
+          deps.offerRepo.close({
+            id: offerIdInMemo,
+            closedByTx: result.committed.id,
+            closedByAgent: agent.id,
+            closedAt
+          });
+          deps.emit({
+            kind: "offer-closed", agentId: agent.id, tickId, at: closedAt,
+            data: {
+              offerId: offerIdInMemo,
+              closedByTx: result.committed.id,
+              closedByAgent: agent.id,
+              closedAt
+            }
+          });
+        }
+      }
+    }
 
     // Relationship updates (identifying counterparties by agent-id prefix in param values)
     for (const value of Object.values(params)) {

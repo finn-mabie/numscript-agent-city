@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { openDb } from "../src/db.js";
-import { agentRepo } from "../src/repositories.js";
+import { agentRepo, offerRepo } from "../src/repositories.js";
 import { tickAgent } from "../src/tick.js";
 import { ROSTER } from "../src/roster.js";
 import { LedgerClient, loadTemplates } from "@nac/template-engine";
@@ -196,5 +196,93 @@ describe("tickAgent with arena injection", () => {
 
     db.close();
     rmSync(path);
+  });
+});
+
+describe("tickAgent with post_offer", () => {
+  it("inserts an offer, emits offer-posted, and does not touch the ledger", async () => {
+    const path = join(tmpdir(), `tick-board-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+    const offers = offerRepo(db);
+
+    let capturedPeers: string[] = [];
+    const llm: LLMClient = {
+      async pickAction() {
+        return {
+          tool: "post_offer", reasoning: "looking for a writer",
+          input: { text: "Need 3-page spec for $8. Reply within 30s." }
+        };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    const outcome = await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e),
+      offerRepo: offers,
+      advancePeersOnOffer: ({ templateOverlapPeers }) => { capturedPeers = templateOverlapPeers; }
+    });
+
+    expect(outcome.result).toMatchObject({ ok: true, postOffer: true });
+    const offerId = (outcome.result as any).offerId;
+    expect(offerId).toMatch(/^off_/);
+
+    const row = offers.get(offerId);
+    expect(row?.authorAgentId).toBe("001");
+    expect(row?.text).toBe("Need 3-page spec for $8. Reply within 30s.");
+    expect(row?.status).toBe("open");
+
+    const posted = events.find((e) => e.kind === "offer-posted");
+    expect(posted).toBeTruthy();
+    expect((posted as any).data.offerId).toBe(offerId);
+    expect(capturedPeers.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("closes an existing offer when a committed tx memo references it", async () => {
+    const path = join(tmpdir(), `tick-board-close-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+    const offers = offerRepo(db);
+
+    // Seed an open root offer authored by agent 002 — agent 001's tx can close it
+    offers.insert({
+      id: "off_test123_abcd", authorAgentId: "002",
+      text: "need p2p, $1", inReplyTo: null,
+      createdAt: Date.now(), expiresAt: Date.now() + 300_000
+    });
+
+    const llm: LLMClient = {
+      async pickAction() {
+        return {
+          tool: "p2p_transfer", reasoning: "closing off_test123_abcd",
+          input: {
+            amount: { asset: "USD/2", amount: 100 },
+            from: "@agents:001:available",
+            to: "@agents:002:available",
+            memo: "settling off_test123_abcd — here you go"
+          }
+        };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e),
+      offerRepo: offers
+    });
+
+    const closed = events.find((e) => e.kind === "offer-closed");
+    expect(closed).toBeTruthy();
+    expect((closed as any).data.offerId).toBe("off_test123_abcd");
+
+    const row = offers.get("off_test123_abcd");
+    expect(row?.status).toBe("closed");
+    expect(row?.closedByAgent).toBe("001");
   });
 });

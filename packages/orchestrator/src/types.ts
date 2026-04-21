@@ -62,5 +62,8 @@ export interface TickOutcome {
   tickId: string;
   agentId: AgentId;
   durationMs: number;
-  result: InvokeResult | { ok: true; idle: true };
+  result:
+    | InvokeResult
+    | { ok: true; idle: true }
+    | { ok: true; postOffer: true; offerId: string };
 }
