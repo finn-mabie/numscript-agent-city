@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@nac/template-engine':
+        specifier: workspace:*
+        version: link:packages/template-engine
     devDependencies:
       tsx:
         specifier: ^4.19.0
