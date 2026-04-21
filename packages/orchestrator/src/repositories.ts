@@ -209,13 +209,13 @@ export function offerRepo(db: Database.Database) {
   const get = db.prepare(`SELECT * FROM offers WHERE id = ?`);
   const openList = db.prepare(`
     SELECT * FROM offers
-    WHERE status = 'open' AND author_agent_id != ?
+    WHERE status = 'open' AND author_agent_id != ? AND expires_at > ?
     ORDER BY created_at DESC
     LIMIT ?
   `);
   const openListAll = db.prepare(`
     SELECT * FROM offers
-    WHERE status = 'open'
+    WHERE status = 'open' AND expires_at > ?
     ORDER BY created_at DESC
     LIMIT ?
   `);
@@ -263,9 +263,10 @@ export function offerRepo(db: Database.Database) {
       return r ? row2rec(r) : null;
     },
     openOffers(limit: number, excludingAuthor?: string): OfferRecord[] {
+      const now = Date.now();
       const rows = excludingAuthor
-        ? (openList.all(excludingAuthor, limit) as any[])
-        : (openListAll.all(limit) as any[]);
+        ? (openList.all(excludingAuthor, now, limit) as any[])
+        : (openListAll.all(now, limit) as any[]);
       return rows.map(row2rec);
     },
     threadOf(rootId: string): OfferRecord[] {
