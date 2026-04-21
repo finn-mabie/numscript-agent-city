@@ -33,7 +33,8 @@ import { LedgerClient, loadTemplates, clientCredentials } from "@nac/template-en
 import {
   openDb, agentRepo, ROSTER,
   anthropicLLM, tickAgent, startScheduler, startEventBus,
-  createArenaQueue, arenaRepo
+  createArenaQueue, arenaRepo,
+  offerRepo
 } from "../src/index.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
 import { startHttp } from "../src/http.js";
@@ -86,6 +87,7 @@ async function main() {
 
   const arenaQueue = createArenaQueue();
   const arena = arenaRepo(db);
+  const offers = offerRepo(db);
   const envSalt = process.env.ARENA_SALT;
   const saltIsValid = typeof envSalt === "string" && envSalt.length >= 16;
   const arenaSalt = saltIsValid ? envSalt! : randomBytes(24).toString("hex");
@@ -126,7 +128,8 @@ async function main() {
           submittedAt
         }
       });
-    }
+    },
+    offerRepo: offers
   });
   console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot (POST /arena)`);
 
@@ -137,7 +140,18 @@ async function main() {
     tickOne: (agent): Promise<TickOutcome> =>
       tickAgent(agent, {
         db, ledger, llm, templates, templatesRoot, emit,
-        arenaQueue, arenaRepo: arena
+        arenaQueue, arenaRepo: arena,
+        offerRepo: offers,
+        advancePeersOnOffer: ({ authorAgentId, offerId, templateOverlapPeers }) => {
+          // Wake up to 3 template-overlap peers that aren't already due soon.
+          const candidates = [...templateOverlapPeers].sort(() => Math.random() - 0.5).slice(0, 3);
+          const soon = Date.now() + 2_000;
+          for (const peerId of candidates) {
+            const a = ag.get(peerId);
+            if (!a) continue;
+            if (a.nextTickAt > soon) ag.updateNextTick(peerId, soon);
+          }
+        }
       }),
     onError: (id, err) => emit({
       kind: "rejected", agentId: id, tickId: `sched:${Date.now()}`, at: Date.now(),
