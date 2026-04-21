@@ -7,3 +7,4 @@ dist/
 /data/
 .claude/
 .superpowers/
+packages/template-engine/test/__fixtures__/

@@ -1,1 +1,0 @@
-{"id":"smoke","description":"smoke","params":{"amount":{"type":"monetary","asset":"USD/2","max":"1000_00"},"to":{"type":"account","pattern":"^@.+"}}}
