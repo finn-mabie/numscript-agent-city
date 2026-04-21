@@ -70,8 +70,8 @@ export default function AgentPanel() {
       className="absolute z-20 top-0 right-0 h-screen w-[460px] bg-ink border-l border-mute p-5 font-mono text-[12px] overflow-y-auto"
       style={{ animation: "panel-in-right 240ms var(--panel-ease, cubic-bezier(0.2,0.9,0.3,1)) both" }}
     >
-      <div className="flex justify-between items-baseline">
-        <div>
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1">
           <div className="text-[10px] uppercase tracking-wider text-dim">Agent {a.id}</div>
           <h2 className="text-lg font-semibold text-paper">{a.name}</h2>
           <div className="text-dim text-[11px]">
@@ -80,7 +80,16 @@ export default function AgentPanel() {
             {loading && <span className="ml-2 text-dim italic">refreshing…</span>}
           </div>
         </div>
-        <button onClick={() => setOpenId(null)} className="text-dim hover:text-paper text-lg leading-none">×</button>
+        <div className="flex flex-col gap-1 items-end">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("nac:arena-open", { detail: { targetAgentId: a.id } }))}
+            className="text-[10px] uppercase tracking-wider border border-[var(--scream)] text-[var(--scream)] px-2 py-0.5 hover:bg-[var(--scream)] hover:text-[var(--ink)] transition-colors"
+          >
+            Attack this agent
+          </button>
+          <button onClick={() => setOpenId(null)} className="text-dim hover:text-paper text-lg leading-none">×</button>
+        </div>
       </div>
 
       <p className="mt-4 text-paper text-[12px] leading-relaxed">{a.tagline}</p>
