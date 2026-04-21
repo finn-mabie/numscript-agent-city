@@ -1,10 +1,14 @@
 import Phaser from "phaser";
+import { useCityStore } from "../../state/city-store";
+import { AgentSprite } from "../agent-sprite";
 
 export const TILE = 16;
 export const GRID_W = 20;
 export const GRID_H = 12;
 
 export class CityScene extends Phaser.Scene {
+  private agents = new Map<string, AgentSprite>();
+
   constructor() { super({ key: "city" }); }
 
   preload() {
@@ -18,7 +22,21 @@ export class CityScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#1a2f1a");
     this.buildGround();
     this.buildBuildings();
-    // Agent sprites wire in Task 10 via store subscription.
+
+    const initial = useCityStore.getState().agents;
+    for (const a of Object.values(initial)) this.spawn(a);
+
+    // React to hydrations that happen AFTER create (common — snapshot fetch
+    // resolves after Phaser mounts).
+    useCityStore.subscribe((s) => {
+      for (const a of Object.values(s.agents)) {
+        if (!this.agents.has(a.id)) this.spawn(a);
+      }
+    });
+  }
+
+  private spawn(a: import("../../state/city-store").AgentView): void {
+    this.agents.set(a.id, new AgentSprite(this, a));
   }
 
   private buildGround(): void {
