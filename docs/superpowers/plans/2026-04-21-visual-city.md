@@ -19,6 +19,71 @@
 
 ---
 
+## Design direction (applies to all chrome tasks — 3, 13, 14, 15, 16)
+
+The Phaser canvas is a pixel village (Kenney sprites, zoom 3, crisp pixel art). The **chrome around it** — HUD bar, hover card, panels, overlays — commits to a distinct, cohesive aesthetic. Default Tailwind + Inter is forbidden: it produces the generic "AI dashboard" look we already decided against.
+
+### Aesthetic: Financial data-room meets arcade cabinet
+
+- **Everything chrome-level is monospace.** Harmonizes with pixel-art's grid discipline. Nothing sans-serif.
+- **One scream color — vermillion `#ec3a2d` — reserved for rejections and attention moments.** Never used decoratively. The rejected-attempts counter pulses in it on every increment. The barrier shields use it. Nothing else.
+- **Warm neutrals, not pure black/white.** `#0a0908` background, `#ede8df` text. A paper-and-ink quality, not a "dark-mode website."
+- **Generous negative space + tight 1px rules.** No cards, no shadows, no gradients. Rules where separation is needed, nothing otherwise.
+- **Tabular numerals everywhere.** Balances, counters, timestamps — all `font-variant-numeric: tabular-nums` so digits don't dance when values change.
+- **Panels slide in with a deliberate curve.** `cubic-bezier(0.2, 0.9, 0.3, 1)` — confident, slight overshoot. Not ease-in-out.
+
+### Design tokens (CSS custom properties, set globally in Task 3)
+
+```css
+:root {
+  --ink: #0a0908;          /* background */
+  --paper: #ede8df;        /* primary text */
+  --dim: #6e6a62;          /* secondary text */
+  --mute: #3a3732;          /* rules, subtle borders */
+  --gold: #f0c457;          /* coin trails, committed-outcome accents */
+  --scream: #ec3a2d;        /* THE rejection color. Use sparingly. */
+  --hustle: #d98b2b;        /* hustle-mode indicator (distinct from gold/scream) */
+  --panel-ease: cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+```
+
+### Typography
+
+Load via `next/font/google` in `src/app/layout.tsx` (Task 3):
+
+```ts
+import { JetBrains_Mono } from "next/font/google";
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mono"
+});
+```
+
+Apply `mono.variable` to `<body>` and set `font-family: var(--font-mono), ui-monospace, monospace;` in `globals.css`. No sans-serif anywhere in the chrome.
+
+### Motion specs (applies to Tasks 14, 15, 16)
+
+- **Panels** (AgentPanel, TxPanel): 240ms slide-in from the respective edge, using `--panel-ease`. Slide-out 180ms with `cubic-bezier(0.4, 0, 1, 0.6)`.
+- **Counter increments** (HudTopBar): when `ticksToday`, `rejectedToday`, etc. increase, do a 200ms scale from 1.00 → 1.08 → 1.00 with a brief color pulse. Rejection counter pulses in `--scream`; others in `--paper`.
+- **Hover card** (AgentCard): fade + 4px translate-up on enter (120ms); instant on leave.
+
+### What the finished chrome should feel like
+
+Reference: think less "shadcn dashboard" and more "a terminal that an auditor designed." Every pixel has a reason; when the rejection counter pulses red, it's the only color on the screen for 200ms and it matters. The pixel-village canvas sits inside this chrome like a photo in a matte: the chrome frames the content without competing for attention.
+
+### What to avoid
+
+- Inter, Roboto, system-ui, Arial — any default sans-serif
+- Tailwind's default `bg-gray-900`, `text-gray-400`, etc. — always through the custom tokens
+- Any gradient (noise-textures, radial-gradients, card shadows)
+- Rounded-corner pills, card shadows, "glassmorphism"
+- Blue `#3b82f6` as an accent — it's the AI-slop default
+- Lucide icons and emoji for ornament (functional indicators like ✓/✗/♦ are fine — they ARE the semantics)
+
+---
+
 ## File structure (created by end of plan)
 
 ```
@@ -444,6 +509,8 @@ export default {
 
 ### Step 5: Write `apps/web/tailwind.config.ts`
 
+Tokens defined via CSS vars (see "Design direction" section) — Tailwind references them so classes stay composable without hard-coding colors twice.
+
 ```ts
 import type { Config } from "tailwindcss";
 
@@ -452,14 +519,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0a0a0a",
-        paper: "#e8e8e6",
-        dim: "#8a8a88",
-        accent: "#ff5a36"
+        ink:    "var(--ink)",
+        paper:  "var(--paper)",
+        dim:    "var(--dim)",
+        mute:   "var(--mute)",
+        gold:   "var(--gold)",
+        scream: "var(--scream)",
+        hustle: "var(--hustle)"
       },
       fontFamily: {
-        sans: ["Geist", "system-ui", "sans-serif"],
-        mono: ["Geist Mono", "ui-monospace", "monospace"]
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"]
+      },
+      transitionTimingFunction: {
+        panel: "cubic-bezier(0.2, 0.9, 0.3, 1)"
       }
     }
   }
@@ -470,20 +542,61 @@ export default config;
 
 ### Step 6: Write `apps/web/src/app/globals.css`
 
+All chrome tasks (13-16) consume these tokens. No task hard-codes hex values except in animation keyframes where a direct reference is unavoidable.
+
 ```css
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body { background: #0a0a0a; color: #e8e8e6; }
-body { font-feature-settings: "ss01", "cv11"; }
+:root {
+  --ink:    #0a0908;
+  --paper:  #ede8df;
+  --dim:    #6e6a62;
+  --mute:   #3a3732;
+  --gold:   #f0c457;
+  --scream: #ec3a2d;
+  --hustle: #d98b2b;
+}
+
+html, body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+/* Counter-pulse keyframes (used by HudTopBar in Task 13) */
+@keyframes tick-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes reject-pulse {
+  0%   { transform: scale(1); color: var(--paper); }
+  20%  { transform: scale(1.12); color: var(--scream); }
+  100% { transform: scale(1); color: var(--paper); }
+}
+
+/* Panel slide-in (used by AgentPanel, TxPanel in Tasks 14, 15) */
+@keyframes panel-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes panel-in-left  { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 ```
 
 ### Step 7: Write `apps/web/src/app/layout.tsx`
 
+Loads JetBrains Mono (the only typeface in the app) via `next/font/google`.
+
 ```tsx
 import type { Metadata } from "next";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mono"
+});
 
 export const metadata: Metadata = {
   title: "Numscript Agent City",
@@ -492,7 +605,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={mono.variable}>
       <body className="min-h-screen">{children}</body>
     </html>
   );
@@ -1418,26 +1531,38 @@ export default function HudTopBar() {
   const uptime = useUptime(bootedAt);
 
   return (
-    <div className="absolute inset-x-0 top-0 px-4 py-2 flex justify-between font-mono text-xs text-paper bg-gradient-to-b from-ink/80 to-transparent pointer-events-none select-none">
-      <div className="flex gap-2 items-center">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_6px_#ff5a36]" />
-        <span className="font-semibold tracking-wide">NUMSCRIPT AGENT CITY</span>
+    <div className="absolute inset-x-0 top-0 px-5 py-3 flex justify-between items-center font-mono text-[11px] text-paper bg-ink border-b border-mute pointer-events-none select-none">
+      <div className="flex items-center gap-2.5">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-scream" style={{ boxShadow: "0 0 8px var(--scream)" }} />
+        <span className="font-semibold tracking-[0.15em] text-paper">NUMSCRIPT · AGENT CITY</span>
       </div>
-      <div className="flex gap-6 text-dim">
+      <div className="flex gap-7 items-baseline">
         <Stat label="in circulation" value={fmtUsd(total)} />
-        <Stat label="ticks" value={String(ticksToday)} />
-        <Stat label="rejected" value={String(rejectedToday)} accent={rejectedToday > 0} />
+        <Stat label="ticks" value={String(ticksToday)} kind="tick" changeKey={ticksToday} />
+        <Stat label="rejected" value={String(rejectedToday)} kind="reject" changeKey={rejectedToday} />
         <Stat label="uptime" value={uptime} />
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Stat({ label, value, kind, changeKey }: { label: string; value: string; kind?: "tick" | "reject"; changeKey?: number }) {
+  // Pulse the value when changeKey mutates. Reject pulse uses --scream; tick pulse is neutral scale-up.
+  const [pulseCount, setPulseCount] = useState(0);
+  useEffect(() => { setPulseCount((n) => n + 1); }, [changeKey]);
+  const animation = kind === "reject" ? "reject-pulse 200ms ease-out"
+                  : kind === "tick"   ? "tick-pulse 200ms ease-out"
+                  : "none";
   return (
-    <div className="flex items-baseline gap-1">
-      <span className={`tabular-nums ${accent ? "text-accent" : "text-paper"}`}>{value}</span>
-      <span className="text-[10px] uppercase tracking-wider text-dim">{label}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span
+        key={`${label}-${pulseCount}`}
+        className="tabular-nums text-paper text-[13px] font-medium inline-block"
+        style={{ animation }}
+      >
+        {value}
+      </span>
+      <span className="text-[9px] uppercase tracking-[0.18em] text-dim">{label}</span>
     </div>
   );
 }
@@ -1521,12 +1646,12 @@ export default function AgentCard() {
 
   return (
     <div
-      className="absolute z-10 font-mono text-[11px] bg-ink/90 border border-dim/40 px-2.5 py-2 pointer-events-none rounded-sm"
+      className="absolute z-10 font-mono text-[11px] bg-ink border border-mute px-3 py-2 pointer-events-none"
       style={{ left: hover.x + 12, top: hover.y - 40 }}
     >
       <div className="font-semibold text-paper">{a.name} <span className="text-dim">· {a.role}</span></div>
       <div className="text-dim text-[10px] italic mt-0.5 max-w-[36ch]">{a.tagline}</div>
-      <div className="mt-1 text-paper tabular-nums">${(a.balance / 100).toFixed(2)}{a.hustleMode ? <span className="ml-1.5 text-accent">♦ hustle</span> : null}</div>
+      <div className="mt-1 text-paper tabular-nums">${(a.balance / 100).toFixed(2)}{a.hustleMode ? <span className="ml-1.5 text-scream">♦ hustle</span> : null}</div>
     </div>
   );
 }
@@ -1557,7 +1682,10 @@ export default function AgentPanel() {
   const entries = recent.filter((r) => r.agentId === a.id).slice(0, 25);
 
   return (
-    <aside className="absolute z-20 top-0 right-0 h-screen w-[420px] bg-ink/95 border-l border-dim/30 p-4 font-mono text-[12px] overflow-y-auto">
+    <aside
+      className="absolute z-20 top-0 right-0 h-screen w-[420px] bg-ink border-l border-mute p-5 font-mono text-[12px] overflow-y-auto"
+      style={{ animation: "panel-in-right 240ms var(--panel-ease, cubic-bezier(0.2,0.9,0.3,1)) both" }}
+    >
       <div className="flex justify-between items-baseline">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-dim">Agent {a.id}</div>
@@ -1577,7 +1705,7 @@ export default function AgentPanel() {
             <div className="text-dim text-[10px]">{new Date(r.createdAt).toLocaleTimeString()}  ·  {r.tickId}</div>
             <div className="text-paper">
               {r.outcome === "committed" && <span className="text-[#6fa86a]">✓ {r.templateId}</span>}
-              {r.outcome === "rejected"  && <span className="text-accent">✗ {r.errorCode} <span className="text-dim">({r.errorPhase})</span></span>}
+              {r.outcome === "rejected"  && <span className="text-scream">✗ {r.errorCode} <span className="text-dim">({r.errorPhase})</span></span>}
               {r.outcome === "idle"      && <span className="text-dim">idle</span>}
             </div>
             {r.reasoning && <div className="text-dim text-[11px] mt-0.5 italic">"{r.reasoning}"</div>}
@@ -1701,7 +1829,10 @@ export default function TxPanel() {
   if (!r) return null;
 
   return (
-    <aside className="absolute z-20 top-0 left-0 h-screen w-[460px] bg-ink/95 border-r border-dim/30 p-4 font-mono text-[12px] overflow-y-auto">
+    <aside
+      className="absolute z-20 top-0 left-0 h-screen w-[460px] bg-ink border-r border-mute p-5 font-mono text-[12px] overflow-y-auto"
+      style={{ animation: "panel-in-left 240ms var(--panel-ease, cubic-bezier(0.2,0.9,0.3,1)) both" }}
+    >
       <div className="flex justify-between items-baseline">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-dim">Transaction</div>
@@ -1716,14 +1847,14 @@ export default function TxPanel() {
       )}
 
       <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Parameters</h3>
-      <pre className="bg-black/40 border border-dim/30 p-2 rounded-sm whitespace-pre-wrap break-words text-[11px] text-paper">
+      <pre className="bg-ink border border-mute p-2.5 whitespace-pre-wrap break-words text-[11px] text-paper">
 {r.params ? JSON.stringify(r.params, null, 2) : "(no params recorded)"}
       </pre>
 
       <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">Outcome</h3>
       <div className="text-paper">
         {r.outcome === "committed" && <span className="text-[#6fa86a]">✓ committed</span>}
-        {r.outcome === "rejected"  && <span className="text-accent">✗ {r.errorCode} <span className="text-dim">({r.errorPhase})</span></span>}
+        {r.outcome === "rejected"  && <span className="text-scream">✗ {r.errorCode} <span className="text-dim">({r.errorPhase})</span></span>}
         {r.outcome === "idle"      && <span className="text-dim">idle</span>}
       </div>
     </aside>
@@ -1816,7 +1947,7 @@ export default function CityStage() {
         <Overlay>Connecting to the city…</Overlay>
       )}
       {status === "error" && (
-        <Overlay>Snapshot unavailable. Is <code className="text-accent">pnpm city:start</code> running?</Overlay>
+        <Overlay>Snapshot unavailable. Is <code className="text-scream">pnpm city:start</code> running?</Overlay>
       )}
       {status === "quiet" && (
         <Overlay subtle>Waiting for the first agent tick…</Overlay>
@@ -1827,7 +1958,7 @@ export default function CityStage() {
 
 function Overlay({ children, subtle }: { children: React.ReactNode; subtle?: boolean }) {
   return (
-    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] px-3 py-1.5 rounded-sm ${subtle ? "text-dim bg-transparent" : "text-paper bg-ink/80 border border-dim/40"}`}>
+    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] px-3 py-1.5 rounded-sm ${subtle ? "text-dim bg-transparent" : "text-paper bg-ink border border-mute"}`}>
       {children}
     </div>
   );
