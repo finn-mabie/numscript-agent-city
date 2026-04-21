@@ -185,3 +185,98 @@ export function arenaRepo(db: Database.Database) {
     }
   };
 }
+
+// ── Offers ────────────────────────────────────────────────────────────────
+export interface OfferRecord {
+  id: string;
+  authorAgentId: string;
+  text: string;
+  inReplyTo: string | null;
+  createdAt: number;
+  expiresAt: number;
+  status: "open" | "closed" | "expired";
+  closedByTx: string | null;
+  closedByAgent: string | null;
+  closedAt: number | null;
+}
+
+export function offerRepo(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT INTO offers
+      (id, author_agent_id, text, in_reply_to, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const get = db.prepare(`SELECT * FROM offers WHERE id = ?`);
+  const openList = db.prepare(`
+    SELECT * FROM offers
+    WHERE status = 'open' AND author_agent_id != ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  const openListAll = db.prepare(`
+    SELECT * FROM offers
+    WHERE status = 'open'
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  const threadStmt = db.prepare(`
+    SELECT * FROM offers
+    WHERE id = ? OR in_reply_to = ?
+    ORDER BY created_at ASC
+  `);
+  const closeStmt = db.prepare(`
+    UPDATE offers
+    SET status = 'closed', closed_by_tx = ?, closed_by_agent = ?, closed_at = ?
+    WHERE id = ? AND status = 'open'
+  `);
+  const expireStmt = db.prepare(`
+    UPDATE offers SET status = 'expired'
+    WHERE status = 'open' AND expires_at < ?
+  `);
+
+  const row2rec = (r: any): OfferRecord => ({
+    id: r.id,
+    authorAgentId: r.author_agent_id,
+    text: r.text,
+    inReplyTo: r.in_reply_to,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+    status: r.status,
+    closedByTx: r.closed_by_tx,
+    closedByAgent: r.closed_by_agent,
+    closedAt: r.closed_at
+  });
+
+  return {
+    insert(args: {
+      id: string;
+      authorAgentId: string;
+      text: string;
+      inReplyTo: string | null;
+      createdAt: number;
+      expiresAt: number;
+    }): void {
+      insert.run(args.id, args.authorAgentId, args.text, args.inReplyTo, args.createdAt, args.expiresAt);
+    },
+    get(id: string): OfferRecord | null {
+      const r = get.get(id);
+      return r ? row2rec(r) : null;
+    },
+    openOffers(limit: number, excludingAuthor?: string): OfferRecord[] {
+      const rows = excludingAuthor
+        ? (openList.all(excludingAuthor, limit) as any[])
+        : (openListAll.all(limit) as any[]);
+      return rows.map(row2rec);
+    },
+    threadOf(rootId: string): OfferRecord[] {
+      return (threadStmt.all(rootId, rootId) as any[]).map(row2rec);
+    },
+    close(args: { id: string; closedByTx: string; closedByAgent: string; closedAt: number }): void {
+      closeStmt.run(args.closedByTx, args.closedByAgent, args.closedAt, args.id);
+    },
+    expireOlderThan(now: number): number {
+      const info = expireStmt.run(now);
+      return info.changes;
+    }
+  };
+}

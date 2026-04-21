@@ -15,7 +15,7 @@ describe("openDb", () => {
       .all() as Array<{ name: string }>;
     const names = tables.map((t) => t.name);
     expect(names).toEqual(
-      expect.arrayContaining(["agents", "relationships", "intent_log", "arena_attacks", "schema_version"])
+      expect.arrayContaining(["agents", "relationships", "intent_log", "arena_attacks", "offers", "schema_version"])
     );
     db.close();
     rmSync(path);
@@ -27,7 +27,7 @@ describe("openDb", () => {
     openDb(path).close(); // would throw on "table already exists" if non-idempotent
     const db = openDb(path);
     const versions = db.prepare(`SELECT version FROM schema_version ORDER BY version`).all();
-    expect(versions).toHaveLength(2);
+    expect(versions).toHaveLength(3);
     db.close();
     rmSync(path);
   });
