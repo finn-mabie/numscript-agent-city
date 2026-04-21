@@ -28,6 +28,13 @@ export interface IntentLogView {
   createdAt: number;
 }
 
+export interface ArenaActiveView {
+  attackId: string;
+  targetAgentId: string;
+  promptPreview: string;
+  submittedAt: number;
+}
+
 interface CityState {
   agents: Record<string, AgentView>;
   recent: IntentLogView[];      // newest first, capped
@@ -36,8 +43,14 @@ interface CityState {
   rejectedToday: number;
   bootedAt: number;             // epoch ms
 
+  // Arena-specific
+  arenaSubmitted: number;                         // total attacks accepted this session
+  arenaRejected: number;                          // attacks the cage caught
+  arenaActive: Record<string, ArenaActiveView>;   // keyed by targetAgentId — currently-incoming attacks
+
   hydrate: (args: { agents: AgentView[]; recent: IntentLogView[] }) => void;
   applyEvent: (e: CityEvent) => void;
+  noteArenaLocalSubmit: (args: { attackId: string; targetAgentId: string; promptPreview: string }) => void;
 }
 
 const RECENT_CAP = 200;
@@ -78,6 +91,9 @@ export const useCityStore = create<CityState>((set) => ({
   committedToday: 0,
   rejectedToday: 0,
   bootedAt: Date.now(),
+  arenaSubmitted: 0,
+  arenaRejected: 0,
+  arenaActive: {},
 
   hydrate({ agents, recent }) {
     const byId: Record<string, AgentView> = {};
@@ -131,7 +147,44 @@ export const useCityStore = create<CityState>((set) => ({
         next.recent = [entry, ...without].slice(0, RECENT_CAP);
       }
 
+      if (e.kind === "arena-submit") {
+        const d = (e as any).data;
+        const alreadyActive = s.arenaActive[d.targetAgentId]?.attackId === d.attackId;
+        next.arenaSubmitted = alreadyActive ? s.arenaSubmitted : s.arenaSubmitted + 1;
+        next.arenaActive = {
+          ...s.arenaActive,
+          [d.targetAgentId]: {
+            attackId: d.attackId,
+            targetAgentId: d.targetAgentId,
+            promptPreview: d.promptPreview || s.arenaActive[d.targetAgentId]?.promptPreview || "",
+            submittedAt: d.submittedAt
+          }
+        };
+      }
+
+      if (e.kind === "arena-resolved") {
+        const d = (e as any).data;
+        if (d.outcome === "rejected" || d.outcome === "idle") {
+          next.arenaRejected = s.arenaRejected + 1;
+        }
+        const activeCopy = { ...s.arenaActive };
+        for (const [agentId, a] of Object.entries(activeCopy)) {
+          if (a.attackId === d.attackId) delete activeCopy[agentId];
+        }
+        next.arenaActive = activeCopy;
+      }
+
       return next;
     });
+  },
+
+  noteArenaLocalSubmit({ attackId, targetAgentId, promptPreview }) {
+    set((s) => ({
+      arenaSubmitted: s.arenaSubmitted + 1,
+      arenaActive: {
+        ...s.arenaActive,
+        [targetAgentId]: { attackId, targetAgentId, promptPreview, submittedAt: Date.now() }
+      }
+    }));
   }
 }));
