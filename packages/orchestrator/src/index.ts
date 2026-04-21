@@ -21,3 +21,5 @@ export { createArenaQueue, newAttackId, hashPrompt, hashIp, promptPreview } from
 export type { ArenaQueue, ArenaQueueOptions, QueuedAttack } from "./arena.js";
 export { arenaRepo } from "./repositories.js";
 export type { ArenaAttackRecord } from "./repositories.js";
+export { createRateLimiter } from "./rate-limit.js";
+export type { RateLimiter, RateLimiterOptions, RateLimitResult } from "./rate-limit.js";

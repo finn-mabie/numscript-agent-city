@@ -1,6 +1,10 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type Database from "better-sqlite3";
 import { agentRepo, intentLogRepo } from "./repositories.js";
+import type { ArenaQueue } from "./arena.js";
+import type { arenaRepo } from "./repositories.js";
+import { newAttackId, hashPrompt, hashIp, promptPreview } from "./arena.js";
+import { createRateLimiter, type RateLimiter } from "./rate-limit.js";
 
 export interface StartHttpOptions {
   port: number;
@@ -11,6 +15,14 @@ export interface StartHttpOptions {
   ledgerGet: (path: string) => Promise<{ ok: boolean; status: number; body: unknown }>;
   /** How many recent intent-log entries per agent (default 20). */
   recentLimit?: number;
+  /** Present only when the arena is wired (run-city path, not tests that only exercise /snapshot). */
+  arenaQueue?: ArenaQueue;
+  arenaRepo?: ReturnType<typeof arenaRepo>;
+  /** Per-process salt for prompt + IP hashing. Must be ≥16 bytes random. */
+  arenaSalt?: string;
+  arenaRateLimit?: { max: number; windowMs: number };
+  /** Hook invoked after an attack is enqueued so the scheduler can bring the agent's nextTickAt forward. */
+  advanceNextTickFor?: (agentId: string) => void;
 }
 
 export interface HttpHandle {
@@ -20,7 +32,7 @@ export interface HttpHandle {
 
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
   "access-control-allow-headers": "content-type"
 };
 
@@ -29,10 +41,28 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { throw new Error("invalid JSON"); }
+}
+
+function clientIp(req: IncomingMessage): string {
+  const xf = req.headers["x-forwarded-for"];
+  if (typeof xf === "string" && xf) return xf.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "0.0.0.0";
+}
+
 export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
   const limit = opts.recentLimit ?? 20;
   const ag = agentRepo(opts.db);
   const log = intentLogRepo(opts.db);
+
+  const arenaLimiter: RateLimiter | null = opts.arenaRateLimit
+    ? createRateLimiter(opts.arenaRateLimit)
+    : null;
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === "OPTIONS") {
@@ -40,6 +70,48 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       res.end();
       return;
     }
+
+    if (req.method === "POST" && req.url && new URL(req.url, "http://127.0.0.1").pathname === "/arena") {
+      if (!opts.arenaQueue || !opts.arenaRepo || !opts.arenaSalt) {
+        return json(res, 503, { error: "arena not configured" });
+      }
+      let body: any;
+      try { body = await readJson(req); }
+      catch { return json(res, 400, { error: "invalid JSON" }); }
+      const targetAgentId = typeof body?.targetAgentId === "string" ? body.targetAgentId : null;
+      const prompt = typeof body?.prompt === "string" ? body.prompt : null;
+      if (!targetAgentId || !prompt) return json(res, 400, { error: "targetAgentId and prompt required" });
+      if (prompt.length > 2000) return json(res, 413, { error: "prompt > 2000 chars" });
+      if (!ag.get(targetAgentId)) return json(res, 404, { error: `unknown agent ${targetAgentId}` });
+
+      const ip = clientIp(req);
+      const ipH = hashIp(ip, opts.arenaSalt);
+      if (arenaLimiter) {
+        const r = arenaLimiter.check(ipH);
+        if (!r.allowed) {
+          res.writeHead(429, {
+            "content-type": "application/json",
+            "retry-after": String(Math.ceil(r.retryAfterMs / 1000)),
+            ...CORS
+          });
+          return res.end(JSON.stringify({ error: "rate limited", retryAfterMs: r.retryAfterMs }));
+        }
+      }
+
+      const attackId = newAttackId();
+      const submittedAt = Date.now();
+      opts.arenaRepo.insert({
+        attackId, targetAgentId,
+        promptHash: hashPrompt(prompt, opts.arenaSalt),
+        promptPreview: promptPreview(prompt),
+        ipHash: ipH, submittedAt
+      });
+      opts.arenaQueue.enqueue({ attackId, targetAgentId, prompt });
+      opts.advanceNextTickFor?.(targetAgentId);
+
+      return json(res, 202, { attackId, targetAgentId, submittedAt });
+    }
+
     if (req.method !== "GET" || !req.url) {
       json(res, 404, { error: "not found" });
       return;
