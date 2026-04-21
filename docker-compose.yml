@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: formance
+      POSTGRES_PASSWORD: formance
+      POSTGRES_DB: ledger
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formance"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  ledger:
+    image: ghcr.io/formancehq/ledger:v2.3.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_URI: postgres://formance:formance@postgres:5432/ledger?sslmode=disable
+      BIND: 0.0.0.0:3068
+    ports:
+      - "3068:3068"
+    command: ["serve"]
