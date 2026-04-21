@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import { useCityStore } from "../../state/city-store";
 import { AgentSprite } from "../agent-sprite";
+import { emitCoins } from "../coin-flow";
+import { floatPopup, floatPopupClickable } from "../amount-popup";
+import { showBarrier, type BarrierKind } from "../barrier";
 
 export const TILE = 16;
 export const GRID_W = 20;
@@ -28,15 +31,59 @@ export class CityScene extends Phaser.Scene {
 
     // React to hydrations that happen AFTER create (common — snapshot fetch
     // resolves after Phaser mounts).
+    const seenTickIds = new Set<string>();
     useCityStore.subscribe((s) => {
       for (const a of Object.values(s.agents)) {
         if (!this.agents.has(a.id)) this.spawn(a);
+      }
+      // Animate any new recent entries (newest-first, so break once we hit a seen one).
+      for (const r of s.recent) {
+        if (seenTickIds.has(r.tickId)) break;
+        seenTickIds.add(r.tickId);
+        this.animateForEntry(r);
       }
     });
   }
 
   private spawn(a: import("../../state/city-store").AgentView): void {
     this.agents.set(a.id, new AgentSprite(this, a));
+  }
+
+  private animateForEntry(r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null }): void {
+    const src = this.agents.get(r.agentId);
+    if (!src) return;
+
+    if (r.outcome === "committed") {
+      const peerId = this.counterpartyFromParams(r.params);
+      const dst = peerId ? this.agents.get(peerId) : undefined;
+      if (dst) emitCoins(this, src.worldX(), src.worldY(), dst.worldX(), dst.worldY(), 700);
+      floatPopupClickable(
+        this,
+        src.worldX(), src.worldY() - 8,
+        `✓ ${r.templateId}`,
+        "#6fa86a",
+        () => window.dispatchEvent(new CustomEvent("nac:tx-click", { detail: { tickId: r.tickId } }))
+      );
+    } else if (r.outcome === "rejected") {
+      const kind: BarrierKind =
+        r.errorPhase === "authorization" ? "authorization" :
+        r.errorPhase === "validate"      ? "validate" :
+        r.errorPhase === "commit"        ? "commit" :
+        r.errorPhase === "load"          ? "load" : "other";
+      showBarrier(this, src.worldX(), src.worldY(), kind, r.errorCode ?? "REJECTED");
+    }
+    // outcome "idle" produces no visual
+  }
+
+  private counterpartyFromParams(params: Record<string, unknown> | null): string | null {
+    if (!params) return null;
+    for (const v of Object.values(params)) {
+      if (typeof v === "string") {
+        const m = v.match(/^@agents:([0-9]+):.+$/);
+        if (m && m[1]) return m[1];
+      }
+    }
+    return null;
   }
 
   private buildGround(): void {
