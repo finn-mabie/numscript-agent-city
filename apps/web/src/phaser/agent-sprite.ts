@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { TILE, GRID_W, GRID_H } from "./scenes/CityScene";
-import type { AgentView } from "../state/city-store";
+import { ANCHORED_IDS, type AgentView } from "../state/city-store";
 
 // How strongly the random walk biases back toward the agent's home tile.
 // 0 = pure random walk; 1 = always step toward home. 0.35 gives a light drift
@@ -48,6 +48,10 @@ export class AgentSprite {
   }
 
   private step(scene: Phaser.Scene): void {
+    // Anchored agents stand at their post (Alice runs the Market, Dave the
+    // Bank, etc.) — only freelancers wander.
+    if (ANCHORED_IDS.has(this.agent.id)) return;
+
     // Distance from home — if we've drifted too far, force a step back.
     const distH = Math.max(Math.abs(this.tx - this.home.tx), Math.abs(this.ty - this.home.ty));
     const mustReturn = distH >= HOME_RADIUS;

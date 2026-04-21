@@ -49,17 +49,23 @@ const RECENT_CAP = 200;
 // the corresponding building. Freelance agents (Eve/Frank/Grace/Judy) anchor in
 // the middle row.
 const START_POSITIONS: Record<string, [number, number]> = {
-  "001": [ 2, 2],   // Alice — Market
-  "002": [12, 2],   // Bob — Post Office
-  "003": [17, 2],   // Carol — Inspector
-  "004": [ 7, 2],   // Dave — Bank
+  "001": [ 2, 2],   // Alice — Market         (anchored)
+  "002": [12, 2],   // Bob — Post Office      (anchored)
+  "003": [17, 2],   // Carol — Inspector      (anchored)
+  "004": [ 7, 2],   // Dave — Bank            (anchored)
   "005": [ 4, 6],   // Eve — freelance (research)
   "006": [ 9, 6],   // Frank — freelance (writing)
   "007": [14, 6],   // Grace — freelance (illustration)
-  "008": [ 5, 10],  // Heidi — Pool
-  "009": [14, 10],  // Ivan — Escrow
+  "008": [ 5, 10],  // Heidi — Pool           (anchored)
+  "009": [14, 10],  // Ivan — Escrow          (anchored)
   "010": [18, 6]    // Judy — Red Agent probe zone
 };
+
+/**
+ * Agents whose job is to "man" a specific building — they stay at their
+ * post instead of wandering. Only freelancers + Judy (005/006/007/010) walk.
+ */
+export const ANCHORED_IDS = new Set(["001", "002", "003", "004", "008", "009"]);
 
 export const useCityStore = create<CityState>((set) => ({
   agents: {},
