@@ -72,6 +72,73 @@ set_tx_meta("agent", "${id}")`,
   else console.log(`✓ seeded agent ${id}`);
 }
 
+// EUR — every agent starts with €50
+for (const id of agents) {
+  const ref = `genesis:eur:agents:${id}:available`;
+  const r = await client.commit({
+    plain: `send [EUR/2 5000] (
+  source      = @mint:genesis allowing unbounded overdraft
+  destination = ${agentAvailable(id)}
+)
+set_tx_meta("type", "GENESIS_SEED")
+set_tx_meta("agent", "${id}")
+set_tx_meta("asset", "EUR/2")`,
+    vars: {},
+    reference: ref
+  });
+  if (r.ok) console.log(`✓ seeded €50 to agent ${id}`);
+  else console.error(`seed eur ${id}: ${r.code} ${r.message}`);
+}
+
+// STRAWBERRY — scarce, only 200 total. Distribute unevenly:
+// Heidi (pool) = 60, Frank (writer, tips) = 40, Grace (illustrator, tips) = 30,
+// Alice (market) = 20, Bob (courier) = 20, remaining agents = 6 each (5×6 = 30)
+const strawberryAllocation: Record<string, number> = {
+  "001": 20, "002": 20, "003": 6, "004": 6, "005": 6,
+  "006": 40, "007": 30, "008": 60, "009": 6, "010": 6
+};
+for (const id of agents) {
+  const amount = strawberryAllocation[id] ?? 0;
+  if (amount === 0) continue;
+  const ref = `genesis:strawberry:agents:${id}:available`;
+  const r = await client.commit({
+    plain: `send [STRAWBERRY/0 ${amount}] (
+  source      = @mint:genesis allowing unbounded overdraft
+  destination = ${agentAvailable(id)}
+)
+set_tx_meta("type", "GENESIS_SEED")
+set_tx_meta("agent", "${id}")
+set_tx_meta("asset", "STRAWBERRY/0")`,
+    vars: {},
+    reference: ref
+  });
+  if (r.ok) console.log(`✓ seeded ${amount} 🍓 to agent ${id}`);
+  else console.error(`seed strawberry ${id}: ${r.code} ${r.message}`);
+}
+
+// COMPUTE_HOUR — also scarce (50 total). Eve (researcher) gets most.
+const computeAllocation: Record<string, number> = {
+  "005": 30, "006": 5, "007": 5, "008": 5, "001": 5
+};
+for (const id of agents) {
+  const amount = computeAllocation[id] ?? 0;
+  if (amount === 0) continue;
+  const ref = `genesis:compute:agents:${id}:available`;
+  const r = await client.commit({
+    plain: `send [COMPUTEHOUR/0 ${amount}] (
+  source      = @mint:genesis allowing unbounded overdraft
+  destination = ${agentAvailable(id)}
+)
+set_tx_meta("type", "GENESIS_SEED")
+set_tx_meta("agent", "${id}")
+set_tx_meta("asset", "COMPUTE_HOUR/0")`,
+    vars: {},
+    reference: ref
+  });
+  if (r.ok) console.log(`✓ seeded ${amount} 💻 to agent ${id}`);
+  else console.error(`seed compute ${id}: ${r.code} ${r.message}`);
+}
+
 // Platform treasury $1,200
 {
   const r = await client.commit({
