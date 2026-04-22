@@ -140,7 +140,8 @@ export default function IntentBoardRail({ adapter }: { adapter: GlyphAdapter }) 
                 </>
               )}
             </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
