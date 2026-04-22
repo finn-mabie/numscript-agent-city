@@ -34,7 +34,8 @@ import {
   openDb, agentRepo, ROSTER,
   anthropicLLM, tickAgent, startScheduler, startEventBus,
   createArenaQueue, arenaRepo,
-  offerRepo
+  offerRepo,
+  dmRepo
 } from "../src/index.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
 import { startHttp } from "../src/http.js";
@@ -88,6 +89,7 @@ async function main() {
   const arenaQueue = createArenaQueue();
   const arena = arenaRepo(db);
   const offers = offerRepo(db);
+  const dms = dmRepo(db);
   const envSalt = process.env.ARENA_SALT;
   const saltIsValid = typeof envSalt === "string" && envSalt.length >= 16;
   const arenaSalt = saltIsValid ? envSalt! : randomBytes(24).toString("hex");
@@ -129,7 +131,8 @@ async function main() {
         }
       });
     },
-    offerRepo: offers
+    offerRepo: offers,
+    dmRepo: dms
   });
   console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot (POST /arena)`);
 
@@ -151,6 +154,16 @@ async function main() {
             if (!a) continue;
             if (a.nextTickAt > soon) ag.updateNextTick(peerId, soon);
           }
+        },
+        dmRepo: dms,
+        advancePeerForDm: ({ recipientAgentId }) => {
+          // Wake the DM recipient so they see the message within ~2 seconds
+          // of its arrival. Only advances if their next tick is more than 2s
+          // out — imminent ticks left alone.
+          const a = ag.get(recipientAgentId);
+          if (!a) return;
+          const soon = Date.now() + 2_000;
+          if (a.nextTickAt > soon) ag.updateNextTick(recipientAgentId, soon);
         }
       }),
     onError: (id, err) => emit({
