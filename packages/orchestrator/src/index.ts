@@ -28,3 +28,5 @@ export { newOfferId, validateOfferText, POST_OFFER_TOOL, OFFER_ID_RE } from "./o
 export { newDmId, validateDmText, SEND_DM_TOOL, DM_ID_RE, DM_TEXT_MAX_LEN } from "./dms.js";
 export { dmRepo } from "./repositories.js";
 export type { DmRecord } from "./repositories.js";
+export { ASSET_REGISTRY, assetByCode, formatAmount, isCommodity } from "./assets.js";
+export type { Asset } from "./assets.js";
