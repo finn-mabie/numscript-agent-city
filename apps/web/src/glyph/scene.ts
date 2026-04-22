@@ -334,21 +334,41 @@ export class GlyphScene extends Phaser.Scene {
     const fromPos = this.agentPos(from);
     const toPos = this.agentPos(to);
 
-    // Draw a mint line between the two agents + a gold coin trail along it.
-    // Skip for self-txs (would be a 0-length line).
+    // Transaction line — bold mint stroke with a labeled midpoint
+    // ("Ⓑ → Ⓓ  $5") so you can read the deal without the receipt popup.
+    // Skip only when the two endpoints are literally the same agent.
     if (from !== to) {
       const line = this.add.graphics();
-      line.lineStyle(1.5, 0xbaeabc, 0.9);
+      line.lineStyle(2.5, 0xbaeabc, 1);
       line.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
       line.setAlpha(0);
-      this.tweens.add({ targets: line, alpha: 1, duration: 140 });
+
+      // Midpoint label: glyph→glyph and amount, on a tiny pill that sits
+      // on the line. Fades in with the line, fades out ahead of it.
+      const fromGlyph = glyphOf(from);
+      const toGlyph = glyphOf(to);
+      const mx = (fromPos.x + toPos.x) / 2;
+      const my = (fromPos.y + toPos.y) / 2;
+      const labelStr = amount > 0
+        ? `${fromGlyph} → ${toGlyph}  $${amount.toFixed(0)}`
+        : `${fromGlyph} → ${toGlyph}`;
+      const pill = this.add.container(mx, my);
+      const pillTxt = this.add.text(0, 0, labelStr, {
+        fontFamily: FONT, fontSize: "10px", color: "#BAEABC",
+        backgroundColor: "#011e22",
+        padding: { left: 4, right: 4, top: 2, bottom: 2 },
+      }).setResolution(2).setOrigin(0.5, 0.5);
+      pill.add(pillTxt);
+      pill.setAlpha(0);
+
+      this.tweens.add({ targets: [line, pill], alpha: 1, duration: 180 });
       this.tweens.add({
-        targets: line, alpha: 0,
-        delay: 900, duration: 500, ease: "cubic.in",
-        onComplete: () => line.destroy(),
+        targets: [line, pill], alpha: 0,
+        delay: 1900, duration: 600, ease: "cubic.in",
+        onComplete: () => { line.destroy(); pill.destroy(); },
       });
 
-      // Coin trail riding on top of the line — 4 gold $ marks, staggered
+      // Coin trail riding on top of the line — 5 gold $ marks, staggered
       this.fireCoinTrail(fromPos, toPos, COLORS.gold);
     }
 

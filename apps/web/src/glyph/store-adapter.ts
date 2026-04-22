@@ -101,7 +101,7 @@ export function createGlyphAdapter(): GlyphAdapter {
       if (prior?.outcome === r.outcome && prior?.templateId === r.templateId) continue;
 
       const amount = amountFromParams(r.params);
-      const peer = counterpartyFromParams(r.params) ?? r.agentId;
+      const peer = counterpartyFromParams(r.params, r.agentId) ?? r.agentId;
       const txid = r.txId ?? r.tickId.split(":")[1] ?? "0";
 
       if (r.outcome === "committed") {
@@ -196,13 +196,19 @@ function amountFromParams(params: unknown): number {
   return 0;
 }
 
-function counterpartyFromParams(params: unknown): string | undefined {
+/**
+ * Extract the COUNTERPARTY agent id from a tx's params, given the acting agent.
+ * Previous impl grabbed the first @agents:NNN in property order, which is
+ * almost always the acting agent themselves (e.g., subscription_charge params
+ * list `subscriber` before `provider`). The corrected impl walks every
+ * @agents:NNN reference and returns the first one that is NOT the actor.
+ */
+function counterpartyFromParams(params: unknown, actorId: string): string | undefined {
   if (!params || typeof params !== "object") return undefined;
   for (const v of Object.values(params as Record<string, unknown>)) {
-    if (typeof v === "string") {
-      const m = v.match(/^@agents:([0-9]{3}):.+$/);
-      if (m && m[1]) return m[1];
-    }
+    if (typeof v !== "string") continue;
+    const m = v.match(/^@agents:([0-9]{3}):.+$/);
+    if (m && m[1] && m[1] !== actorId) return m[1];
   }
   return undefined;
 }
