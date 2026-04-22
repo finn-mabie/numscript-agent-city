@@ -60,10 +60,8 @@ export function createGlyphAdapter(): GlyphAdapter {
   const emit = (ev: string, p: AnyGlyphEvent) => {
     const ls = listeners[ev];
     if (ls && ls.size > 0) {
-      if (ev !== "tick") console.log(`[glyph-adapter] emit→${ls.size} listener(s):`, ev, p);
       ls.forEach((fn) => fn(p));
     } else {
-      if (ev !== "tick") console.log(`[glyph-adapter] BUFFER ${ev} (no listener yet)`, p);
       const buf = (buffers[ev] ||= []);
       buf.push(p);
       if (buf.length > BUFFER_CAP) buf.shift();
@@ -82,7 +80,6 @@ export function createGlyphAdapter(): GlyphAdapter {
   // is a live event and emits normally.
   const HYDRATE_WINDOW_MS = 800;
   const seedingEndsAt = Date.now() + HYDRATE_WINDOW_MS;
-  console.log(`[glyph-adapter] mounted; hydrate window ${HYDRATE_WINDOW_MS}ms`);
 
   const unsub = useCityStore.subscribe((s, prev) => {
     const isHydrating = Date.now() < seedingEndsAt;
@@ -164,11 +161,8 @@ export function createGlyphAdapter(): GlyphAdapter {
       // where events arrive before the scene / HUD has subscribed.
       const pending = buffers[ev];
       if (pending && pending.length > 0) {
-        console.log(`[glyph-adapter] listener subscribed for ${ev}; flushing ${pending.length} buffered`);
         buffers[ev] = [];
         for (const p of pending) fn(p);
-      } else {
-        console.log(`[glyph-adapter] listener subscribed for ${ev}`);
       }
     },
     off(ev, fn) { listeners[ev]?.delete(fn); },

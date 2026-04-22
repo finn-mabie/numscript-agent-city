@@ -64,7 +64,6 @@ export class GlyphScene extends Phaser.Scene {
   }
 
   create() {
-    console.log("[glyph-scene] create() running");
     this.cameras.main.setBackgroundColor(COLORS.sky);
 
     // Dotted grid
@@ -170,12 +169,10 @@ export class GlyphScene extends Phaser.Scene {
     }
 
     // Adapter wiring (push-driven; no tick loop)
-    console.log("[glyph-scene] wiring adapter listeners");
     this.adapter.on("intent",     (p) => this.onIntent(p as GlyphIntentEvent));
     this.adapter.on("commit",     (p) => this.onCommit(p as GlyphCommitEvent));
     this.adapter.on("reject",     (p) => this.onReject(p as GlyphRejectEvent));
     this.adapter.on("agent-move", (p) => this.onAgentMove(p as GlyphMoveEvent));
-    console.log("[glyph-scene] create() done");
   }
 
   update(_t: number, _dt: number) {
@@ -264,28 +261,52 @@ export class GlyphScene extends Phaser.Scene {
     });
   }
 
-  private onIntent({ from, to, kind, amount, judy }: GlyphIntentEvent) {
-    // Small typed bubble at sender — gold for root, silver for reply
+  private onIntent({ from, to, kind, amount, summary, judy }: GlyphIntentEvent) {
+    // Speech-bubble at sender — gold for root offer, silver for reply.
+    // Shows WHO is talking + the first part of what they're saying, not "$0".
     const fromPos = this.agentPos(from);
     const color = judy ? COLORS.red : (kind === "offer" ? COLORS.gold : COLORS.silver);
-    const bubble = this.add.container(fromPos.x + 20, fromPos.y - 24);
-    const bg = this.add.rectangle(0, 0, 150, 28, 0x011e22, 1)
+    const sender = glyphAgentById(from);
+    const name = sender?.name ?? from;
+
+    // Clip body text — bubble gets wider than the older $-bubble
+    const shown = summary && summary.length > 48 ? summary.slice(0, 45).trimEnd() + "…" : (summary ?? "");
+    const headText = kind === "offer" ? `◆ ${sender?.glyph ?? from} ${name.toUpperCase()} OFFERS` : `↘ ${sender?.glyph ?? from} ${name.toUpperCase()} REPLIES`;
+    const bubbleW = Math.max(180, Math.min(280, shown.length * 5.2 + 24));
+    const bubbleH = shown ? 38 : 26;
+
+    const bubble = this.add.container(fromPos.x + 20, fromPos.y - bubbleH - 6);
+    const bg = this.add.rectangle(0, 0, bubbleW, bubbleH, 0x011e22, 1)
       .setStrokeStyle(1, Phaser.Display.Color.HexStringToColor(color).color);
     bg.setOrigin(0, 0);
-    const head = this.add.text(6, 4, kind === "offer" ? "◆ OFFER" : "↘ REPLY", {
+    const head = this.add.text(6, 4, headText, {
       fontFamily: FONT, fontSize: "8px", color, letterSpacing: 1.2,
     }).setResolution(2);
-    const body = this.add.text(6, 16, `$${amount}`, {
-      fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
-    }).setResolution(2);
-    bubble.add([bg, head, body]);
+    const body = shown
+      ? this.add.text(6, 16, shown, {
+          fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
+          wordWrap: { width: bubbleW - 12 },
+        }).setResolution(2)
+      : null;
+    // If there's a concrete amount (>0), show a small "— $N" suffix in the head
+    if (amount > 0) {
+      const amt = this.add.text(bubbleW - 6, 4, `$${amount}`, {
+        fontFamily: FONT, fontSize: "8px", color: COLORS.gold, letterSpacing: 1.2,
+      }).setResolution(2).setOrigin(1, 0);
+      bubble.add(amt);
+    }
+    bubble.add([bg, head, ...(body ? [body] : [])]);
     bubble.setAlpha(0);
     this.tweens.add({ targets: bubble, alpha: 1, duration: 120 });
-    this.receipts.push({ container: bubble, bornAt: this.time.now, duration: 1500 });
+    this.receipts.push({ container: bubble, bornAt: this.time.now, duration: 2400 });
 
-    // Animate a coin trail from sender to receiver (if to is an agent id)
-    const toSprite = this.agentSprites.get(to);
-    if (toSprite) this.fireCoinTrail(fromPos, this.agentPos(to), judy ? COLORS.red : COLORS.gold);
+    // Coin trail only for REPLY intents that actually cross between agents
+    // (root offers are broadcasts — from==to for us, so we skip to avoid a
+    // self-loop particle trail that makes no sense).
+    if (kind === "reply" && to !== from) {
+      const toSprite = this.agentSprites.get(to);
+      if (toSprite) this.fireCoinTrail(fromPos, this.agentPos(to), judy ? COLORS.red : COLORS.gold);
+    }
   }
 
   private fireCoinTrail(from: { x: number; y: number }, to: { x: number; y: number }, color: string) {

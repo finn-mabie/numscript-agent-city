@@ -25,7 +25,6 @@ const WS_URL = process.env.NEXT_PUBLIC_CITY_WS ?? "ws://127.0.0.1:3070";
  * Phaser's browser-only module doesn't get pulled into the server bundle.
  */
 export default function GlyphStage() {
-  console.log("[glyph-stage] render");
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const didInitRef = useRef(false);
@@ -53,9 +52,7 @@ export default function GlyphStage() {
     const openTimer = setTimeout(() => {
       if (cancelled) return;
       ws = new WebSocket(WS_URL);
-      ws.onopen = () => console.log("[glyph] WS open");
-      ws.onclose = () => console.log("[glyph] WS close");
-      ws.onerror = (e) => console.log("[glyph] WS error", e);
+      ws.onerror = (e) => console.warn("[glyph] WS error", e);
       ws.onmessage = (ev) => {
         try { useCityStore.getState().applyEvent(JSON.parse(ev.data)); } catch { /* ignore */ }
       };
@@ -75,7 +72,6 @@ export default function GlyphStage() {
   // initialized for the component's lifetime. On real unmount (navigate
   // away) the component fully re-mounts and the ref resets.
   useEffect(() => {
-    console.log("[glyph-stage] phaser effect run", { hasWrap: !!canvasWrapRef.current, alreadyInit: didInitRef.current });
     if (!canvasWrapRef.current) return;
     if (didInitRef.current) return;
     didInitRef.current = true;
@@ -91,7 +87,6 @@ export default function GlyphStage() {
       scene: [new GlyphScene(adapter)]
     });
     gameRef.current = game;
-    console.log("[glyph-stage] Phaser.Game constructed");
     // NOTE: no cleanup — StrictMode's phantom cleanup would destroy
     // Phaser before scene.create() even runs. Leaking a Phaser game on
     // real remount is a dev-only cost we tolerate.
