@@ -29,7 +29,13 @@ export default function GlyphStage() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const adapter = useMemo(() => createGlyphAdapter(), []);
 
-  // Hydrate once on mount (same pattern as CityStage).
+  // Hydrate once on mount.
+  // NOTE on the delayed WS open: React 18 StrictMode in dev mounts every
+  // effect twice — mount → cleanup → mount again. If we open the WebSocket
+  // synchronously, the cleanup runs before the handshake completes and the
+  // browser logs "WebSocket is closed before the connection is established."
+  // The short setTimeout skips past the phantom cycle: on the real mount we
+  // open, on real unmount we close.
   useEffect(() => {
     fetch(`${ORCH_BASE}/snapshot`, { cache: "no-store" })
       .then((r) => r.json())
@@ -40,11 +46,25 @@ export default function GlyphStage() {
       .then((b) => useCityStore.getState().hydrateOffers(b.offers ?? []))
       .catch(() => { /* non-fatal */ });
 
-    const ws = new WebSocket(WS_URL);
-    ws.onmessage = (ev) => {
-      try { useCityStore.getState().applyEvent(JSON.parse(ev.data)); } catch { /* ignore */ }
+    let ws: WebSocket | null = null;
+    let cancelled = false;
+    const openTimer = setTimeout(() => {
+      if (cancelled) return;
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => console.log("[glyph] WS open");
+      ws.onclose = () => console.log("[glyph] WS close");
+      ws.onerror = (e) => console.log("[glyph] WS error", e);
+      ws.onmessage = (ev) => {
+        try { useCityStore.getState().applyEvent(JSON.parse(ev.data)); } catch { /* ignore */ }
+      };
+    }, 60);
+    return () => {
+      cancelled = true;
+      clearTimeout(openTimer);
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
     };
-    return () => { ws.close(); };
   }, []);
 
   // Mount Phaser once the wrap element exists.
