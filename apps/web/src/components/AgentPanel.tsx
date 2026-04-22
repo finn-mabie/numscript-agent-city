@@ -175,6 +175,39 @@ export default function AgentPanel() {
       )}
 
       <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">
+        Conversations {dms.length > 0 ? `· ${conversationsByPeer.length} peer${conversationsByPeer.length === 1 ? "" : "s"}` : ""}
+      </h3>
+      {conversationsByPeer.length === 0 ? (
+        <div className="text-dim italic text-[11px]">no direct messages yet</div>
+      ) : (
+        <ul className="space-y-3">
+          {conversationsByPeer.map(([peerId, thread]) => (
+            <li key={peerId} className="border-l-2 border-mute pl-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-dim">with agent {peerId}</div>
+              <ul className="space-y-1 mt-1">
+                {thread.map((d) => {
+                  const isOut = d.fromAgentId === openId;
+                  return (
+                    <li key={d.id} className="text-[11px]">
+                      <span className={isOut ? "text-gold" : "text-paper"}>
+                        {isOut ? "→ you said:" : `← ${peerId} said:`}
+                      </span>{" "}
+                      <span className="text-paper">{d.text}</span>
+                      {d.inReplyTo && (
+                        <span className="text-dim text-[10px] ml-1">
+                          (reply to {d.inReplyTo})
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">
         Ledger transactions {detail ? `· ${detail.transactions.length}` : ""}
       </h3>
       <ul className="space-y-2">
@@ -222,38 +255,6 @@ export default function AgentPanel() {
         ))}
       </ul>
 
-      <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">
-        Conversations {dms.length > 0 ? `· ${conversationsByPeer.length} peer${conversationsByPeer.length === 1 ? "" : "s"}` : ""}
-      </h3>
-      {conversationsByPeer.length === 0 ? (
-        <div className="text-dim italic text-[11px]">no direct messages yet</div>
-      ) : (
-        <ul className="space-y-3">
-          {conversationsByPeer.map(([peerId, thread]) => (
-            <li key={peerId} className="border-l-2 border-mute pl-2.5">
-              <div className="text-[10px] uppercase tracking-wider text-dim">with agent {peerId}</div>
-              <ul className="space-y-1 mt-1">
-                {thread.map((d) => {
-                  const isOut = d.fromAgentId === openId;
-                  return (
-                    <li key={d.id} className="text-[11px]">
-                      <span className={isOut ? "text-gold" : "text-paper"}>
-                        {isOut ? "→ you said:" : `← ${peerId} said:`}
-                      </span>{" "}
-                      <span className="text-paper">{d.text}</span>
-                      {d.inReplyTo && (
-                        <span className="text-dim text-[10px] ml-1">
-                          (reply to {d.inReplyTo})
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
     </aside>
   );
 }
