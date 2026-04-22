@@ -11,16 +11,23 @@ interface Base {
 
 export type CityEvent =
   | (Base & { kind: "tick-start" })
-  | (Base & { kind: "intent";              data: { tool: string; input: Record<string, unknown>; reasoning: string } })
+  | (Base & { kind: "intent";              data: { tool: string; input: Record<string, unknown>; reasoning: string; attackId?: string } })
   | (Base & { kind: "dry-run" })
-  | (Base & { kind: "committed";           data: { templateId: string; txId: string } })
-  | (Base & { kind: "rejected";            data: { phase: RejectionPhase; code: string; message: string } })
-  | (Base & { kind: "idle" })
+  | (Base & { kind: "committed";           data: { templateId: string; txId: string; attackId?: string } })
+  | (Base & { kind: "rejected";            data: { phase: RejectionPhase; code: string; message: string; attackId?: string } })
+  | (Base & { kind: "idle";                data?: { attackId?: string } })
   | (Base & { kind: "hustle-enter" })
   | (Base & { kind: "hustle-exit" })
-  | (Base & { kind: "relationship-update"; data: { peerId: AgentId; trust: number } });
+  | (Base & { kind: "relationship-update"; data: { peerId: AgentId; trust: number } })
+  | (Base & { kind: "arena-submit";        data: { attackId: string; targetAgentId: AgentId; promptPreview: string; submittedAt: number } })
+  | (Base & { kind: "arena-resolved";      data: { attackId: string; outcome: "committed" | "rejected" | "idle"; phase: RejectionPhase | null; code: string | null; tickId: string } })
+  | (Base & { kind: "offer-posted"; data: { offerId: string; authorAgentId: AgentId; text: string; inReplyTo: string | null; expiresAt: number } })
+  | (Base & { kind: "offer-closed"; data: { offerId: string; closedByTx: string; closedByAgent: AgentId; closedAt: number } })
+  | (Base & { kind: "dm-sent"; data: { dmId: string; fromAgentId: AgentId; toAgentId: AgentId; preview: string; inReplyTo: string | null; inReplyKind: "dm" | "offer" | null } })
+  | (Base & { kind: "price-signal-set"; data: { signalId: string; assetCode: string; targetPrice: number; expiresAt: number } })
+  | (Base & { kind: "price-vwap-update"; data: { assetCode: string; vwap: number | null; samples: number; asOf: number } });
 
-export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler";
+export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler" | "exception";
 
 // Narrowing helper for switch-exhaustiveness in consumers.
 export function matchEvent<T>(e: CityEvent, handlers: {

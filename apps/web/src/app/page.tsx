@@ -1,8 +1,12 @@
 "use client";
+import "./glyph-tokens.css";
+import "./shell.css";
 import dynamic from "next/dynamic";
 
-const CityStage = dynamic(() => import("../components/CityStage"), { ssr: false });
+// Dynamic import with ssr:false — Phaser is browser-only; without this the
+// SSR pass tries to evaluate phaser.esm.js's window references and blows up.
+const GlyphStage = dynamic(() => import("../glyph/GlyphStage"), { ssr: false });
 
 export default function Home() {
-  return <CityStage />;
+  return <GlyphStage />;
 }

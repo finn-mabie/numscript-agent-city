@@ -44,7 +44,14 @@ export type CityEventKind =
   | "idle"
   | "hustle-enter"
   | "hustle-exit"
-  | "relationship-update";
+  | "relationship-update"
+  | "arena-submit"
+  | "arena-resolved"
+  | "offer-posted"
+  | "offer-closed"
+  | "dm-sent"
+  | "price-signal-set"
+  | "price-vwap-update";
 
 export interface CityEvent {
   kind: CityEventKind;
@@ -58,5 +65,9 @@ export interface TickOutcome {
   tickId: string;
   agentId: AgentId;
   durationMs: number;
-  result: InvokeResult | { ok: true; idle: true };
+  result:
+    | InvokeResult
+    | { ok: true; idle: true }
+    | { ok: true; postOffer: true; offerId: string }
+    | { ok: true; sentDm: true; dmId: string };
 }

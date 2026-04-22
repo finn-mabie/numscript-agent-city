@@ -14,16 +14,23 @@ export default function ActivityTicker() {
   const entries = recent.slice(0, 12);
 
   return (
-    <div className="absolute bottom-5 left-5 font-mono text-[11px] pointer-events-none space-y-[2px] max-w-[520px]">
-      <div className="text-[9px] uppercase tracking-[0.2em] text-dim mb-1.5">activity · live</div>
+    <div className="absolute bottom-5 left-5 font-mono text-[11px] space-y-[2px] max-w-[520px]">
+      <div className="text-[9px] uppercase tracking-[0.2em] text-dim mb-1.5 pointer-events-none">activity · live · click for details</div>
       {entries.length === 0 ? (
-        <div className="text-dim italic">no events yet — agents waking up…</div>
+        <div className="text-dim italic pointer-events-none">no events yet — agents waking up…</div>
       ) : (
         entries.map((r, i) => {
           const opacity = Math.max(0.25, 1 - i * 0.075);
           const name = agents[r.agentId]?.name ?? `agent ${r.agentId}`;
+          const clickable = r.templateId !== null; // idle has no template
           return (
-            <div key={r.tickId} className="flex gap-2 items-baseline tabular-nums" style={{ opacity }}>
+            <div
+              key={r.tickId}
+              className={`flex gap-2 items-baseline tabular-nums ${clickable ? "cursor-pointer hover:bg-mute/40 px-1 -mx-1 transition-colors" : "pointer-events-none"}`}
+              style={{ opacity }}
+              onClick={clickable ? () => window.dispatchEvent(new CustomEvent("nac:tx-click", { detail: { tickId: r.tickId } })) : undefined}
+              title={clickable ? `Click to inspect ${r.templateId}` : undefined}
+            >
               <span className="text-dim text-[10px]">{new Date(r.createdAt).toTimeString().slice(0, 8)}</span>
               <span className="text-paper w-[52px] shrink-0">{name}</span>
               {r.outcome === "pending" && (

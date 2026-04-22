@@ -1,0 +1,67 @@
+/* Glyph City design tokens — scoped to the /glyph route. */
+
+@font-face {
+  font-family: 'Polymath Display';
+  src: url('/fonts/PolymathDisp-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Polymath Display';
+  src: url('/fonts/PolymathDisp-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Polymath Text';
+  src: url('/fonts/PolymathText-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMonoVariable.woff2') format('woff2');
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+
+.glyph-root {
+  --sky:        #01353C;
+  --sky-deep:   #011E22;
+  --sky-800:    #012A30;
+  --sky-700:    #023740;
+  --sky-rule:   #0a4048;
+
+  --ink:        #D5E1E1;
+  --ink-soft:   #A6BEC0;
+  --ink-dim:    #7A9396;
+  --ink-ghost:  #486568;
+
+  --gold:       #D4A24A;
+  --gold-soft:  #8B7537;
+  --silver:     #A6BEC0;
+  --mint:       #BAEABC;
+  --mint-dim:   #749B76;
+  --scream:     #E5534B;
+  --scream-soft:#8B3632;
+
+  --schema:     #60D6CE;
+  --unknown-c:  #E8A84A;
+  --seen-c:     #B79BD9;
+
+  --a-alice: #D4A24A;
+  --a-bob:   #60D6CE;
+  --a-carol: #BAEABC;
+  --a-dave:  #8CB8D6;
+  --a-eve:   #B79BD9;
+  --a-frank: #E8A84A;
+  --a-grace: #F5B8C8;
+  --a-heidi: #7FD6A8;
+  --a-ivan:  #C9B892;
+  --a-judy:  #E5534B;
+
+  --font-display: 'Polymath Display', ui-serif, Georgia, serif;
+  --font-text:    'Polymath Text', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    'Berkeley Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --cell: 12px;
+  background: var(--sky-deep);
+  color: var(--ink);
+  font-family: var(--font-mono);
+}

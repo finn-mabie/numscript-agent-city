@@ -15,7 +15,10 @@ export interface SchedulerHandle {
 }
 
 export function startScheduler(opts: SchedulerOptions): SchedulerHandle {
-  const intervalMs = opts.intervalMs ?? 3000;
+  // Default 750ms poll — fast enough that new due-ticks fire within a second
+  // of their deadline (important for arena/board advance-hooks that nudge
+  // nextTickAt to now+2s).
+  const intervalMs = opts.intervalMs ?? 750;
   const now = opts.now ?? Date.now;
   const ag = agentRepo(opts.db);
   let stopped = false;
@@ -24,16 +27,22 @@ export function startScheduler(opts: SchedulerOptions): SchedulerHandle {
   async function pump(): Promise<void> {
     if (stopped) return;
     const due = ag.dueAt(now());
-    for (const agent of due) {
-      if (stopped) return;
-      try {
-        await opts.tickOne(agent);
-      } catch (e) {
-        opts.onError?.(agent.id, e);
-        // Still advance this agent's next_tick_at so a poison tick doesn't loop
-        ag.updateNextTick(agent.id, now() + 60_000);
-      }
-    }
+    // Parallel fan-out: due agents tick concurrently. Without this, a queue
+    // of 3 agents with ~2s LLM calls each serialized into 6s of head-of-line
+    // blocking, making the UI feel stuck. Concurrency is bounded by `due`
+    // size (≤ number of agents), so no runaway.
+    await Promise.all(
+      due.map(async (agent) => {
+        if (stopped) return;
+        try {
+          await opts.tickOne(agent);
+        } catch (e) {
+          opts.onError?.(agent.id, e);
+          // Still advance this agent's next_tick_at so a poison tick doesn't loop
+          ag.updateNextTick(agent.id, now() + 60_000);
+        }
+      })
+    );
   }
 
   const timer = setInterval(() => {

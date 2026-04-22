@@ -22,6 +22,8 @@ export default function HudTopBar() {
   const ticksToday = useCityStore((s) => s.ticksToday);
   const rejectedToday = useCityStore((s) => s.rejectedToday);
   const bootedAt = useCityStore((s) => s.bootedAt);
+  const arenaSubmitted = useCityStore((s) => s.arenaSubmitted);
+  const arenaRejected = useCityStore((s) => s.arenaRejected);
 
   const total = Object.values(agents).reduce((sum, a) => sum + a.balance, 0);
   const uptime = useUptime(bootedAt);
@@ -36,8 +38,34 @@ export default function HudTopBar() {
         <Stat label="in circulation" value={fmtUsd(total)} />
         <Stat label="ticks" value={String(ticksToday)} kind="tick" changeKey={ticksToday} />
         <Stat label="rejected" value={String(rejectedToday)} kind="reject" changeKey={rejectedToday} />
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--dim)]">Attacks rejected</span>
+          <span
+            key={arenaRejected}
+            className="text-xl tabular-nums text-[var(--scream)]"
+            style={{ animation: "reject-pulse 220ms var(--panel-ease)" }}
+          >
+            {arenaRejected}
+            <span className="text-xs text-[var(--dim)] ml-1">/ {arenaSubmitted}</span>
+          </span>
+        </div>
         <Stat label="uptime" value={uptime} />
       </div>
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent("nac:arena-open"))}
+        className="ml-2 text-[10px] uppercase tracking-wider border border-[var(--scream)] text-[var(--scream)] px-2 py-1 hover:bg-[var(--scream)] hover:text-[var(--ink)] transition-colors pointer-events-auto"
+      >
+        Try to compromise · /
+      </button>
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent("nac:board-toggle"))}
+        className="ml-2 text-[10px] uppercase tracking-wider border border-[var(--mute)] text-[var(--paper)] px-2 py-1 hover:bg-[var(--mute)] transition-colors pointer-events-auto"
+        title="Toggle the intent board (shortcut: b)"
+      >
+        Board · b
+      </button>
     </div>
   );
 }

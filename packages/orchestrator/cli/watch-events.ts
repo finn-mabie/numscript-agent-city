@@ -28,6 +28,22 @@ function format(e: CityEvent): string {
     case "hustle-enter": return `${head} ${yellow("♦ hustle mode on")}`;
     case "hustle-exit":  return `${head} ${yellow("♦ hustle mode off")}`;
     case "relationship-update": return `${head} ${dim(`rel ${e.data?.peerId} ↔ ${e.data?.trust}`)}`;
+    case "arena-submit": return `${head} ${cyan("[arena]")} submit attack ${dim(String(e.data?.attackId))}`;
+    case "arena-resolved": return `${head} ${cyan("[arena]")} resolved ${String(e.data?.outcome)} ${dim(String(e.data?.attackId))}`;
+    case "offer-posted":
+      return `${head} ${dim("offer")} ${(e.data as any).text?.slice(0, 60) ?? ""}`;
+    case "offer-closed":
+      return `${head} ${dim("offer-closed")} ${(e.data as any).offerId}`;
+    case "dm-sent":
+      return `${head} ${dim("dm→")} ${(e.data as any).toAgentId} ${dim("·")} ${(e.data as any).preview?.slice(0, 40) ?? ""}`;
+    case "price-signal-set":
+      return `${head} ${dim("price!")} ${(e.data as any).assetCode} → ${(e.data as any).targetPrice}`;
+    case "price-vwap-update":
+      return `${head} ${dim("vwap")} ${(e.data as any).assetCode} ${(e.data as any).vwap ?? "—"}`;
+    default: {
+      const _exhaustive: never = e.kind;
+      return `${head} ${dim(`(unhandled ${(_exhaustive as any)})`)}`;
+    }
   }
 }
 

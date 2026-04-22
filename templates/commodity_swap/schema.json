@@ -1,0 +1,11 @@
+{
+  "id": "commodity_swap",
+  "description": "Atomic barter between two agents. A gives $give to B; B gives $take to A. Both sides must have sufficient balance. Used for crossing asset boundaries (USD ↔ STRAWBERRY, EUR ↔ USD, etc.).",
+  "params": {
+    "agent_a":  { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
+    "agent_b":  { "type": "account",  "pattern": "^@agents:[0-9]{3}:available$" },
+    "give":     { "type": "monetary", "max": "10000_00", "min": "1" },
+    "take":     { "type": "monetary", "max": "10000_00", "min": "1" },
+    "swap_ref": { "type": "string",   "maxLength": 140 }
+  }
+}

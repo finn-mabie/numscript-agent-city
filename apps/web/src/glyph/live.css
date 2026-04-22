@@ -1,0 +1,112 @@
+/* Glyph City — live prototype styles. Layered on top of the reference sheet styles.
+   Dissolved chrome: top rail, canvas, intent board, ticker — one surface, hairlines only. */
+
+html, body { margin:0; padding:0; background:#011E22; color:#D5E1E1;
+  font-family: 'Berkeley Mono', ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; }
+
+body.live {
+  background-image:
+    radial-gradient(circle, rgba(213,225,225,0.05) 1px, transparent 1.25px);
+  background-size: 12px 12px;
+}
+
+.live-shell {
+  display: grid;
+  grid-template-rows: 28px 1fr 72px;
+  grid-template-columns: 1fr 320px;
+  grid-template-areas:
+    "top  top"
+    "cvs  ib"
+    "tk   tk";
+  width: 100vw; height: 100vh;
+  gap: 0;
+}
+
+/* Top rail */
+.tr { grid-area: top;
+  display: flex; align-items: center; gap: 26px;
+  padding: 0 18px;
+  font-size: 10px; letter-spacing: 1.6px; color: #7A9396;
+  border-bottom: 1px solid #0a4048;
+  text-transform: uppercase;
+}
+.tr-brand { color: #D5E1E1; }
+.tr-red   { color: #E5534B; }
+.tr-mint  { color: #BAEABC; }
+.tr-dim   { color: #7A9396; }
+.tr-spacer { flex: 1; }
+
+/* Canvas frame */
+.canvas-wrap {
+  grid-area: cvs;
+  position: relative;
+  border-right: 1px solid #0a4048;
+  overflow: hidden;
+  min-height: 0;
+}
+.canvas-wrap > canvas { display: block; }
+
+/* Intent board */
+.ib { grid-area: ib;
+  padding: 14px 16px 16px;
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: 10px;
+  font-size: 11px;
+}
+.ib-head, .ib-log-head {
+  font-size: 10px; letter-spacing: 1.6px; color: #7A9396; text-transform: uppercase;
+  padding-bottom: 6px; border-bottom: 1px solid #0a4048;
+}
+.ib-threads { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; overflow: hidden; }
+.ib-thread { display: flex; flex-direction: column; gap: 4px; }
+.ib-root, .ib-reply {
+  position: relative;
+  padding: 8px 10px;
+  border: 1px solid #0a4048;
+  background: #011E22;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.ib-committed .ib-root { border-color: #749B76; }
+.ib-rejected  .ib-root { border-color: #8B3632; }
+.ib-judy      .ib-root { border-color: #8B3632; background: repeating-linear-gradient(45deg,
+  #011E22 0, #011E22 4px, rgba(229,83,75,0.06) 4px, rgba(229,83,75,0.06) 6px); }
+
+.ib-reply {
+  margin-left: 18px;
+  border-left: 1px dashed #486568;
+}
+.ib-connector { display: none; }
+
+.ib-tag { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; }
+.ib-who { font-size: 13px; }
+.ib-amt { color: #D4A24A; justify-self: end; }
+.ib-sum { grid-column: 1/-1; color: #A6BEC0; font-size: 10px; }
+.ib-state { grid-column: 1/-1; font-size: 9px; letter-spacing: 1.2px; }
+
+.ib-log { display: flex; flex-direction: column; gap: 3px; max-height: 150px; overflow: hidden; }
+.ib-log-row { display: grid; grid-template-columns: 1.3fr 0.9fr 0.6fr; gap: 10px; font-size: 10px; letter-spacing: 1px; }
+
+/* Ticker */
+.tk { grid-area: tk;
+  border-top: 1px solid #0a4048;
+  padding: 10px 18px;
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 18px; align-items: center;
+  font-size: 10px;
+  overflow: hidden;
+}
+.tk-lbl { color: #7A9396; letter-spacing: 1.6px; text-transform: uppercase; }
+.tk-rows { display: flex; gap: 32px; overflow: hidden; }
+.tk-row { display: flex; gap: 10px; align-items: baseline; white-space: nowrap; }
+.tk-tx  { color: #7A9396; letter-spacing: 1px; }
+.tk-who { color: #D5E1E1; }
+.tk-amt { letter-spacing: 1.2px; }
+
+/* Bottom bottom — the slim stats rail, on top of ticker via padding tricks */
+.br { position: fixed; bottom: 0; left: 0; right: 320px;
+  display: none; /* placeholder if we want a second row */
+}

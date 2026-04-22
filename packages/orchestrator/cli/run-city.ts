@@ -1,10 +1,45 @@
 #!/usr/bin/env tsx
 import { resolve } from "node:path";
+import { randomBytes } from "node:crypto";
+import { readFileSync, existsSync } from "node:fs";
 import { LedgerClient, loadTemplates, clientCredentials } from "@nac/template-engine";
+
+// Auto-load .env from the repo root so `pnpm city:start` works without
+// manual `export` incantations. Walks up from cwd looking for the nearest
+// .env. Values already set in the shell win (don't clobber).
+(function loadDotenv() {
+  const candidates = [
+    process.env.INIT_CWD,
+    process.cwd(),
+    resolve(process.cwd(), ".."),
+    resolve(process.cwd(), "../.."),
+    resolve(process.cwd(), "../../..")
+  ].filter(Boolean) as string[];
+  for (const dir of candidates) {
+    const envPath = resolve(dir, ".env");
+    if (!existsSync(envPath)) continue;
+    for (const line of readFileSync(envPath, "utf8").split("\n")) {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/i);
+      if (!m) continue;
+      const [, key, rawVal] = m;
+      // Only skip if shell has a non-empty value — empty strings in the shell
+      // are usually accidental leftovers and should NOT block the .env file.
+      if (process.env[key]) continue;
+      process.env[key] = rawVal.replace(/^['"]|['"]$/g, "");
+    }
+    break; // first match wins
+  }
+})();
 import {
   openDb, agentRepo, ROSTER,
-  anthropicLLM, tickAgent, startScheduler, startEventBus
+  anthropicLLM, tickAgent, startScheduler, startEventBus,
+  createArenaQueue, arenaRepo,
+  offerRepo,
+  dmRepo,
+  priceSignalRepo
 } from "../src/index.js";
+import { computeVwap, extractSwapSamples } from "../src/vwap.js";
+import { ASSET_REGISTRY } from "../src/assets.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
 import { startHttp } from "../src/http.js";
 
@@ -54,26 +89,137 @@ async function main() {
   console.error(`[city] ledger    ${process.env.LEDGER_URL ?? "http://localhost:3068"}/v2/${process.env.LEDGER_NAME ?? "city"}`);
   console.error(`[city] db        ${dbPath}`);
 
+  const arenaQueue = createArenaQueue();
+  const arena = arenaRepo(db);
+  const offers = offerRepo(db);
+  const dms = dmRepo(db);
+  const priceSignals = priceSignalRepo(db);
+  const priceSignalSalt = process.env.PRICE_SIGNAL_SALT && process.env.PRICE_SIGNAL_SALT.length >= 16
+    ? process.env.PRICE_SIGNAL_SALT
+    : randomBytes(24).toString("hex");
+  const envSalt = process.env.ARENA_SALT;
+  const saltIsValid = typeof envSalt === "string" && envSalt.length >= 16;
+  const arenaSalt = saltIsValid ? envSalt! : randomBytes(24).toString("hex");
+  const saltSource = saltIsValid
+    ? "env-provided"
+    : envSalt !== undefined && envSalt.length > 0
+      ? "ephemeral (ARENA_SALT env var < 16 chars — ignored)"
+      : "ephemeral (restart will invalidate ip_hash correlations)";
+  console.error(`[city] arena salt ${saltSource}`);
+
   const httpPort = Number(process.env.CITY_HTTP_PORT ?? 3071);
   const http = await startHttp({
     port: httpPort,
     db,
     getBalance: (addr) => ledger.getBalance(addr, "USD/2"),
-    ledgerGet: (path) => ledger.get(path)
+    getBalancesByAccount: (addr) => ledger.getBalancesByAccount(addr),
+    ledgerGet: (path) => ledger.get(path),
+    templatesRoot,
+    arenaQueue,
+    arenaRepo: arena,
+    arenaSalt,
+    arenaRateLimit: { max: 5, windowMs: 60_000 },
+    advanceNextTickFor: ({ agentId, attackId, promptPreview, submittedAt }) => {
+      // Bring the target agent's next tick forward so the attack fires quickly.
+      // If they're already due within 2s, leave it alone.
+      const a = ag.get(agentId);
+      if (!a) return;
+      const soon = Date.now() + 2_000;
+      if (a.nextTickAt > soon) ag.updateNextTick(agentId, soon);
+      bus.emit({
+        kind: "arena-submit",
+        agentId,
+        tickId: `arena:${attackId}`,   // synthetic tickId now real attack-id based
+        at: Date.now(),
+        data: {
+          attackId,
+          targetAgentId: agentId,
+          promptPreview,
+          submittedAt
+        }
+      });
+    },
+    offerRepo: offers,
+    dmRepo: dms,
+    priceSignalRepo: priceSignals,
+    priceSignalSalt,
+    priceSignalRateLimit: { max: 2, windowMs: 5 * 60_000 },
+    onPriceSignalSet: (args) => {
+      bus.emit({
+        kind: "price-signal-set",
+        agentId: "-",
+        tickId: `signal:${args.signalId}`,
+        at: Date.now(),
+        data: args
+      });
+    },
   });
-  console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot`);
+  console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot (POST /arena)`);
 
   const emit = (e: CityEvent) => bus.emit(e);
 
   const sched = startScheduler({
     db,
     tickOne: (agent): Promise<TickOutcome> =>
-      tickAgent(agent, { db, ledger, llm, templates, templatesRoot, emit }),
+      tickAgent(agent, {
+        db, ledger, llm, templates, templatesRoot, emit,
+        arenaQueue, arenaRepo: arena,
+        offerRepo: offers,
+        advancePeersOnOffer: ({ authorAgentId, offerId, templateOverlapPeers }) => {
+          // Wake up to 3 template-overlap peers that aren't already due soon.
+          const candidates = [...templateOverlapPeers].sort(() => Math.random() - 0.5).slice(0, 3);
+          const soon = Date.now() + 2_000;
+          for (const peerId of candidates) {
+            const a = ag.get(peerId);
+            if (!a) continue;
+            if (a.nextTickAt > soon) ag.updateNextTick(peerId, soon);
+          }
+        },
+        dmRepo: dms,
+        priceSignalRepo: priceSignals,
+        advancePeerForDm: ({ recipientAgentId }) => {
+          // Wake the DM recipient so they see the message within ~2 seconds
+          // of its arrival. Only advances if their next tick is more than 2s
+          // out — imminent ticks left alone.
+          const a = ag.get(recipientAgentId);
+          if (!a) return;
+          const soon = Date.now() + 2_000;
+          if (a.nextTickAt > soon) ag.updateNextTick(recipientAgentId, soon);
+        }
+      }),
     onError: (id, err) => emit({
       kind: "rejected", agentId: id, tickId: `sched:${Date.now()}`, at: Date.now(),
       data: { phase: "scheduler", code: "TICK_FAILURE", message: (err as Error).message }
     })
   });
+
+  // Background VWAP ticker — every 30s, compute VWAP per asset from the
+  // last 10 min of ledger txs and broadcast via WS. Keeps sparklines
+  // moving even when trading is quiet.
+  const vwapTimer = setInterval(async () => {
+    for (const asset of ASSET_REGISTRY) {
+      try {
+        const txsRes = await ledger.get(
+          `/transactions?metadata[asset]=${encodeURIComponent(asset.code)}&pageSize=100`
+        );
+        const body = txsRes.body as any;
+        const rawTxs = Array.isArray(body?.cursor?.data) ? body.cursor.data : [];
+        const samples = extractSwapSamples(rawTxs, asset.code).filter(
+          (s) => s.timestamp >= Date.now() - 10 * 60_000
+        );
+        const vwap = computeVwap(samples);
+        bus.emit({
+          kind: "price-vwap-update",
+          agentId: "-",
+          tickId: `vwap:${asset.code}:${Date.now()}`,
+          at: Date.now(),
+          data: { assetCode: asset.code, vwap, samples: samples.length, asOf: Date.now() }
+        });
+      } catch {
+        // non-fatal
+      }
+    }
+  }, 30_000);
 
   let shuttingDown = false;
   const shutdown = async () => {
@@ -81,6 +227,7 @@ async function main() {
     shuttingDown = true;
     console.error("\n[city] shutting down…");
     await sched.stop();
+    clearInterval(vwapTimer);
     http.server.close();
     await bus.close();
     db.close();

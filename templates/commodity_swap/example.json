@@ -1,0 +1,7 @@
+{
+  "agent_a":  "@agents:001:available",
+  "agent_b":  "@agents:007:available",
+  "give":     { "asset": "USD/2", "amount": 500 },
+  "take":     { "asset": "STRAWBERRY/0", "amount": 3 },
+  "swap_ref": "alice-grace-strawberry-2026-04-22"
+}

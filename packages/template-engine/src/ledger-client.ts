@@ -128,6 +128,27 @@ export class LedgerClient {
     return Number(vol.balance ?? 0);
   }
 
+  /**
+   * Returns ALL asset balances for an account in one call. Map keyed by
+   * asset code, values are minor units (integer). Empty map on HTTP error.
+   */
+  async getBalancesByAccount(account: string): Promise<Map<string, number>> {
+    const addr = account.startsWith("@") ? account.slice(1) : account;
+    const res = await fetch(
+      `${this.baseUrl}/v2/${this.ledger}/accounts/${encodeURIComponent(addr)}?expand=volumes`,
+      { headers: await this.headers() }
+    );
+    if (!res.ok) return new Map();
+    const body = (await res.json().catch(() => ({}))) as { data?: any } & any;
+    const data = body.data ?? body;
+    const volumes = data?.volumes ?? {};
+    const out = new Map<string, number>();
+    for (const [asset, vol] of Object.entries(volumes)) {
+      out.set(asset, Number((vol as any)?.balance ?? 0));
+    }
+    return out;
+  }
+
   private async headers(): Promise<Record<string, string>> {
     const h: Record<string, string> = { "content-type": "application/json" };
     if (this.options.getAuthToken) {

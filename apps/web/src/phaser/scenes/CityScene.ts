@@ -3,7 +3,10 @@ import { useCityStore } from "../../state/city-store";
 import { AgentSprite } from "../agent-sprite";
 import { emitCoins } from "../coin-flow";
 import { floatPopup, floatPopupClickable } from "../amount-popup";
-import { showBarrier, type BarrierKind } from "../barrier";
+import { showBarrier, barrierKindFor } from "../barrier";
+import { incomingPulse, promptBubble, rejectedBanner, reverseCoinTrail, type BubbleHandle } from "../arena-effects";
+import { offerBubble, threadConnector, type OfferBubbleHandle } from "../intent-board-effects";
+import { BUILDINGS } from "../../lib/buildings";
 
 export const TILE = 16;
 export const GRID_W = 20;
@@ -26,6 +29,8 @@ export class CityScene extends Phaser.Scene {
   // Thought bubbles for pending intents, keyed by tickId. Cleared when the
   // terminal outcome (committed / rejected / idle) arrives.
   private thinking = new Map<string, Phaser.GameObjects.GameObject[]>();
+  private arenaBubbles = new Map<string, BubbleHandle>();
+  private offerBubbles = new Map<string, OfferBubbleHandle>();
 
   create() {
     this.cameras.main.setBackgroundColor("#1a2f1a");
@@ -49,6 +54,55 @@ export class CityScene extends Phaser.Scene {
         if (prior?.outcome === r.outcome) continue;
         this.animateForEntry(r, prior?.outcome);
       }
+
+      // Arena incoming pulse — fires when a new attack appears in arenaActive.
+      for (const [targetAgentId, attack] of Object.entries(s.arenaActive)) {
+        const wasActive = prev?.arenaActive[targetAgentId]?.attackId === attack.attackId;
+        if (wasActive) continue;
+        const sprite = this.agents.get(targetAgentId);
+        if (!sprite) continue;
+        incomingPulse(this, sprite.worldX(), sprite.worldY());
+        const b = promptBubble(this, sprite.worldX(), sprite.worldY() - 4, attack.promptPreview);
+        this.arenaBubbles.set(attack.attackId, b);
+      }
+      // Clean up bubbles whose attack left arenaActive (tick resolved).
+      if (prev) {
+        for (const [, oldAttack] of Object.entries(prev.arenaActive)) {
+          if (!Object.values(s.arenaActive).some((a) => a.attackId === oldAttack.attackId)) {
+            this.arenaBubbles.get(oldAttack.attackId)?.destroy();
+            this.arenaBubbles.delete(oldAttack.attackId);
+          }
+        }
+      }
+
+      // Offer bubbles — fire when a new offer appears in the store
+      for (const [id, o] of Object.entries(s.offers)) {
+        const wasKnown = prev?.offers[id] !== undefined;
+        if (wasKnown) continue;
+        if (o.status !== "open") continue;
+        const sprite = this.agents.get(o.authorAgentId);
+        if (!sprite) continue;
+        const kind: "root" | "reply" = o.inReplyTo ? "reply" : "root";
+        const b = offerBubble(this, sprite.worldX(), sprite.worldY() - 4, o.text, kind);
+        this.offerBubbles.set(o.id, b);
+        // Thread connector: if reply, draw line from replier to parent author
+        if (o.inReplyTo) {
+          const parent = s.offers[o.inReplyTo];
+          const parentSprite = parent ? this.agents.get(parent.authorAgentId) : undefined;
+          if (parentSprite) {
+            threadConnector(this, sprite.worldX(), sprite.worldY(), parentSprite.worldX(), parentSprite.worldY());
+          }
+        }
+      }
+      // Clean up bubbles for offers that left the store (rare — bubbles usually self-fade via timer)
+      if (prev) {
+        for (const id of Object.keys(prev.offers)) {
+          if (!s.offers[id]) {
+            this.offerBubbles.get(id)?.destroy();
+            this.offerBubbles.delete(id);
+          }
+        }
+      }
     });
   }
 
@@ -57,7 +111,7 @@ export class CityScene extends Phaser.Scene {
   }
 
   private animateForEntry(
-    r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null },
+    r: { agentId: string; outcome: string; templateId: string | null; errorPhase: string | null; errorCode: string | null; tickId: string; params: Record<string, unknown> | null; attackId: string | null },
     priorOutcome?: string
   ): void {
     const src = this.agents.get(r.agentId);
@@ -86,12 +140,16 @@ export class CityScene extends Phaser.Scene {
         () => window.dispatchEvent(new CustomEvent("nac:tx-click", { detail: { tickId: r.tickId } }))
       );
     } else if (r.outcome === "rejected") {
-      const kind: BarrierKind =
-        r.errorPhase === "authorization" ? "authorization" :
-        r.errorPhase === "validate"      ? "validate" :
-        r.errorPhase === "commit"        ? "commit" :
-        r.errorPhase === "load"          ? "load" : "other";
+      const kind = barrierKindFor(r.errorPhase, r.errorCode);
       showBarrier(this, src.worldX(), src.worldY(), kind, r.errorCode ?? "REJECTED");
+      // Arena attack → dramatic banner + reverse coin trail
+      if (r.attackId) {
+        const bannerY = src.worldY() - 22;
+        rejectedBanner(this, src.worldX(), bannerY);
+        const peerId = this.counterpartyFromParams(r.params);
+        const dst = peerId ? this.agents.get(peerId) : undefined;
+        if (dst) reverseCoinTrail(this, dst.worldX(), dst.worldY(), src.worldX(), src.worldY());
+      }
     }
     // outcome "idle" produces no visual (bubble was already cleared above)
   }
@@ -154,25 +212,36 @@ export class CityScene extends Phaser.Scene {
     // Six building landmarks. Each one has its OWN archetype drawn from
     // primitives — a market stall, a columned bank, a post-office box, an
     // inspector's kiosk, an actual pool of water, and a vault block.
-    const defs: Array<{ tx: number; ty: number; label: string; draw: (scene: Phaser.Scene, cx: number, cy: number) => void }> = [
-      { tx:  2, ty:  2, label: "Market",      draw: drawMarket      },
-      { tx:  7, ty:  2, label: "Bank",        draw: drawBank        },
-      { tx: 12, ty:  2, label: "Post Office", draw: drawPostOffice  },
-      { tx: 17, ty:  2, label: "Inspector",   draw: drawInspector   },
-      { tx:  5, ty: 10, label: "Pool",        draw: drawPool        },
-      { tx: 14, ty: 10, label: "Escrow",      draw: drawEscrow      }
-    ];
+    const DRAW_BY_LABEL: Record<string, (s: Phaser.Scene, cx: number, cy: number) => void> = {
+      "Market":      drawMarket,
+      "Bank":        drawBank,
+      "Post Office": drawPostOffice,
+      "Inspector":   drawInspector,
+      "Pool":        drawPool,
+      "Escrow":      drawEscrow
+    };
 
-    for (const d of defs) {
+    for (const d of BUILDINGS) {
       const cx = d.tx * TILE + TILE;
       const cy = d.ty * TILE + TILE * 0.6;  // building center pulled UP a bit so label fits above
-      d.draw(this, cx, cy);
+      const draw = DRAW_BY_LABEL[d.label];
+      if (draw) draw(this, cx, cy);
       this.add.text(cx, cy - TILE * 1.6, d.label, {
         fontFamily: "ui-monospace, monospace",
         fontSize: "13px",
         color: "#ede8df",
         fontStyle: "700"
       }).setOrigin(0.5, 1).setResolution(4);
+
+      // Transparent hit-area over the building footprint — dispatches the
+      // nac:building-click event which BuildingPanel listens to.
+      const hit = this.add.rectangle(cx, cy, TILE * 3, TILE * 2.5, 0xffffff, 0);
+      hit.setInteractive({ useHandCursor: true });
+      hit.on("pointerup", () => {
+        window.dispatchEvent(new CustomEvent("nac:building-click", { detail: { buildingId: d.id } }));
+      });
+      hit.on("pointerover", () => { hit.setStrokeStyle(1, 0xede8df, 0.3); });
+      hit.on("pointerout",  () => { hit.setStrokeStyle(); });
     }
   }
 }
@@ -187,8 +256,14 @@ const OUTLINE = 0xede8df;
 /** MARKET — open-air stall with striped awning, counter, and crates. */
 function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
   const W = 40, postH = 12;
-  // Sloped awning top (single triangle across full width — no floating crown)
-  s.add.triangle(cx, cy - 9, -W/2, 3, 0, -5, W/2, 3, 0x5a3a22).setStrokeStyle(1, OUTLINE);
+  // Sloped awning top — drawn via Graphics with absolute coords so it lands
+  // exactly where we want (Phaser.Triangle re-centers on its bounding box,
+  // which visibly shifts asymmetric triangles up-left).
+  const awning = s.add.graphics();
+  awning.fillStyle(0x5a3a22, 1);
+  awning.fillTriangle(cx - W/2, cy - 6, cx + W/2, cy - 6, cx, cy - 14);
+  awning.lineStyle(1, OUTLINE, 1);
+  awning.strokeTriangle(cx - W/2, cy - 6, cx + W/2, cy - 6, cx, cy - 14);
   // Striped awning band (3 stripes, each on its own rectangle, cleanly stacked)
   const stripes = [0xc69361, 0x9a6b47, 0xc69361];
   for (let i = 0; i < stripes.length; i++) {
@@ -208,8 +283,16 @@ function drawMarket(s: Phaser.Scene, cx: number, cy: number): void {
 /** BANK — greek temple: pediment triangle, columns, vault door. */
 function drawBank(s: Phaser.Scene, cx: number, cy: number): void {
   const W = 34, bodyH = 18;
-  // Pediment (top triangle)
-  s.add.triangle(cx, cy - bodyH/2 - 1, -W/2 - 2, 0, 0, -9, W/2 + 2, 0, 0xbfa25d).setStrokeStyle(1, OUTLINE);
+  // Pediment — drawn via Graphics with absolute coords (Phaser.Triangle
+  // re-centers asymmetric geometry, producing the wrong origin).
+  const pedimentBaseY = cy - bodyH/2 - 1;       // sits flush atop the entablature
+  const pedimentHalfW = W/2 + 2;
+  const pedimentPeakY = pedimentBaseY - 9;
+  const ped = s.add.graphics();
+  ped.fillStyle(0xbfa25d, 1);
+  ped.fillTriangle(cx - pedimentHalfW, pedimentBaseY, cx + pedimentHalfW, pedimentBaseY, cx, pedimentPeakY);
+  ped.lineStyle(1, OUTLINE, 1);
+  ped.strokeTriangle(cx - pedimentHalfW, pedimentBaseY, cx + pedimentHalfW, pedimentBaseY, cx, pedimentPeakY);
   // Entablature (thin horizontal band below pediment)
   s.add.rectangle(cx, cy - bodyH/2 + 1, W + 4, 2, 0x544529).setStrokeStyle(1, OUTLINE);
   // Base platform (step below body)

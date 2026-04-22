@@ -2,6 +2,15 @@
 import { create } from "zustand";
 import type { CityEvent } from "../lib/event-schema";
 
+export interface MarketSnapshot {
+  assetCode: string;
+  vwap: number | null;
+  vwapHistory: number[];   // last ~30 samples for sparkline
+  target: number | null;
+  targetExpiresAt: number | null;
+  updatedAt: number;
+}
+
 export interface AgentView {
   id: string;
   name: string;
@@ -9,6 +18,7 @@ export interface AgentView {
   tagline: string;
   color: string;
   balance: number;        // USD/2 minor units
+  balancesByAsset?: Record<string, number>;  // full per-asset map from /snapshot
   hustleMode: 0 | 1;
   x: number;              // tile coord; assigned at snapshot time
   y: number;
@@ -25,6 +35,37 @@ export interface IntentLogView {
   errorPhase: string | null;
   errorCode: string | null;
   txId: string | null;
+  attackId: string | null;
+  createdAt: number;
+}
+
+export interface ArenaActiveView {
+  attackId: string;
+  targetAgentId: string;
+  promptPreview: string;
+  submittedAt: number;
+}
+
+export interface OfferView {
+  id: string;
+  authorAgentId: string;
+  text: string;
+  inReplyTo: string | null;
+  createdAt: number;
+  expiresAt: number;
+  status: "open" | "closed" | "expired";
+  closedByTx: string | null;
+  closedByAgent: string | null;
+  closedAt: number | null;
+}
+
+export interface DmView {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  preview: string;       // WS carries preview only — full text from /dms/agent/:id
+  inReplyTo: string | null;
+  inReplyKind: "dm" | "offer" | null;
   createdAt: number;
 }
 
@@ -36,8 +77,24 @@ interface CityState {
   rejectedToday: number;
   bootedAt: number;             // epoch ms
 
+  // Arena-specific
+  arenaSubmitted: number;                         // total attacks accepted this session
+  arenaRejected: number;                          // attacks the cage caught
+  arenaActive: Record<string, ArenaActiveView>;   // keyed by targetAgentId — currently-incoming attacks
+
+  // Offers
+  offers: Record<string, OfferView>;
+
+  // Direct messages
+  dms: Record<string, DmView>;
+
+  // Market data
+  market: Record<string, MarketSnapshot>;
+
   hydrate: (args: { agents: AgentView[]; recent: IntentLogView[] }) => void;
   applyEvent: (e: CityEvent) => void;
+  hydrateOffers: (offers: OfferView[]) => void;
+  noteArenaLocalSubmit: (args: { attackId: string; targetAgentId: string; promptPreview: string }) => void;
 }
 
 const RECENT_CAP = 200;
@@ -55,7 +112,7 @@ const RECENT_CAP = 200;
 const START_POSITIONS: Record<string, [number, number]> = {
   "001": [ 2, 4],   // Alice — Market         (below Market)
   "002": [12, 4],   // Bob — Post Office      (below Post Office)
-  "003": [17, 4],   // Carol — Inspector      (below Inspector)
+  "003": [18, 4],   // Carol — Inspector      (below Inspector)
   "004": [ 7, 4],   // Dave — Bank            (below Bank)
   "005": [ 4, 6],   // Eve — freelance (research)
   "006": [ 9, 6],   // Frank — freelance (writing)
@@ -78,14 +135,30 @@ export const useCityStore = create<CityState>((set) => ({
   committedToday: 0,
   rejectedToday: 0,
   bootedAt: Date.now(),
+  arenaSubmitted: 0,
+  arenaRejected: 0,
+  arenaActive: {},
+  offers: {},
+  dms: {},
+  market: {},
 
   hydrate({ agents, recent }) {
     const byId: Record<string, AgentView> = {};
     for (const a of agents) {
       const [x, y] = START_POSITIONS[a.id] ?? [0, 0];
-      byId[a.id] = { ...a, x, y };
+      byId[a.id] = {
+        ...a,
+        x, y,
+        balancesByAsset: (a as any).balancesByAsset ?? undefined
+      };
     }
     set({ agents: byId, recent: recent.slice(0, RECENT_CAP) });
+  },
+
+  hydrateOffers(offers) {
+    const byId: Record<string, OfferView> = {};
+    for (const o of offers) byId[o.id] = o;
+    set({ offers: byId });
   },
 
   applyEvent(e) {
@@ -124,6 +197,7 @@ export const useCityStore = create<CityState>((set) => ({
           errorPhase: e.kind === "rejected" ? (e as any).data?.phase ?? null : null,
           errorCode:  e.kind === "rejected" ? (e as any).data?.code  ?? null : null,
           txId:       e.kind === "committed" ? (e as any).data?.txId ?? null : null,
+          attackId:   (e as any).data?.attackId ?? existing?.attackId ?? null,
           createdAt:  existing?.createdAt ?? e.at
         };
         // Remove any existing entry with this tickId, then prepend the fresh one.
@@ -131,7 +205,116 @@ export const useCityStore = create<CityState>((set) => ({
         next.recent = [entry, ...without].slice(0, RECENT_CAP);
       }
 
+      if (e.kind === "arena-submit") {
+        const d = (e as any).data;
+        const alreadyActive = s.arenaActive[d.targetAgentId]?.attackId === d.attackId;
+        next.arenaSubmitted = alreadyActive ? s.arenaSubmitted : s.arenaSubmitted + 1;
+        next.arenaActive = {
+          ...s.arenaActive,
+          [d.targetAgentId]: {
+            attackId: d.attackId,
+            targetAgentId: d.targetAgentId,
+            promptPreview: d.promptPreview || s.arenaActive[d.targetAgentId]?.promptPreview || "",
+            submittedAt: d.submittedAt
+          }
+        };
+      }
+
+      if (e.kind === "arena-resolved") {
+        const d = (e as any).data;
+        if (d.outcome === "rejected" || d.outcome === "idle") {
+          next.arenaRejected = s.arenaRejected + 1;
+        }
+        const activeCopy = { ...s.arenaActive };
+        for (const [agentId, a] of Object.entries(activeCopy)) {
+          if (a.attackId === d.attackId) delete activeCopy[agentId];
+        }
+        next.arenaActive = activeCopy;
+      }
+
+      if (e.kind === "offer-posted") {
+        const d = (e as any).data;
+        next.offers = {
+          ...s.offers,
+          [d.offerId]: {
+            id: d.offerId,
+            authorAgentId: d.authorAgentId,
+            text: d.text,
+            inReplyTo: d.inReplyTo,
+            createdAt: e.at,
+            expiresAt: d.expiresAt,
+            status: "open",
+            closedByTx: null,
+            closedByAgent: null,
+            closedAt: null
+          }
+        };
+      }
+
+      if (e.kind === "offer-closed") {
+        const d = (e as any).data;
+        const existing = s.offers[d.offerId];
+        if (existing) {
+          next.offers = {
+            ...s.offers,
+            [d.offerId]: {
+              ...existing,
+              status: "closed",
+              closedByTx: d.closedByTx,
+              closedByAgent: d.closedByAgent,
+              closedAt: d.closedAt
+            }
+          };
+        }
+      }
+
+      if (e.kind === "dm-sent") {
+        const d = (e as any).data;
+        next.dms = {
+          ...s.dms,
+          [d.dmId]: {
+            id: d.dmId,
+            fromAgentId: d.fromAgentId,
+            toAgentId: d.toAgentId,
+            preview: d.preview,
+            inReplyTo: d.inReplyTo,
+            inReplyKind: d.inReplyKind,
+            createdAt: e.at
+          }
+        };
+      }
+
+      if (e.kind === "price-signal-set") {
+        const d = (e as any).data;
+        const existing = s.market[d.assetCode] ?? { assetCode: d.assetCode, vwap: null, vwapHistory: [], target: null, targetExpiresAt: null, updatedAt: 0 };
+        next.market = {
+          ...s.market,
+          [d.assetCode]: { ...existing, target: d.targetPrice, targetExpiresAt: d.expiresAt, updatedAt: e.at }
+        };
+      }
+      if (e.kind === "price-vwap-update") {
+        const d = (e as any).data;
+        const existing = s.market[d.assetCode] ?? { assetCode: d.assetCode, vwap: null, vwapHistory: [], target: null, targetExpiresAt: null, updatedAt: 0 };
+        const history = d.vwap !== null
+          ? [...existing.vwapHistory, d.vwap].slice(-30)
+          : existing.vwapHistory;
+        next.market = {
+          ...s.market,
+          [d.assetCode]: { ...existing, vwap: d.vwap, vwapHistory: history, updatedAt: d.asOf }
+        };
+      }
+
       return next;
     });
+  },
+
+  noteArenaLocalSubmit({ attackId, targetAgentId, promptPreview }) {
+    set((s) => ({
+      arenaSubmitted: s.arenaSubmitted + 1,
+      arenaActive: {
+        ...s.arenaActive,
+        [targetAgentId]: { attackId, targetAgentId, promptPreview, submittedAt: Date.now() }
+      }
+    }));
   }
 }));
