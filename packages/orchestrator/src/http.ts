@@ -9,6 +9,10 @@ import type { offerRepo as offerRepoFactory } from "./repositories.js";
 import type { dmRepo as dmRepoFactory } from "./repositories.js";
 import { newAttackId, hashPrompt, hashIp, promptPreview } from "./arena.js";
 import { createRateLimiter, type RateLimiter } from "./rate-limit.js";
+import type { priceSignalRepo as priceSignalRepoFactory } from "./repositories.js";
+import { newPriceSignalId, validateSignalNote } from "./price-signals.js";
+import { computeVwap, extractSwapSamples } from "./vwap.js";
+import { ASSET_REGISTRY } from "./assets.js";
 
 export interface StartHttpOptions {
   port: number;
@@ -39,6 +43,11 @@ export interface StartHttpOptions {
   templatesRoot?: string;
   offerRepo?: ReturnType<typeof offerRepoFactory>;
   dmRepo?: ReturnType<typeof dmRepoFactory>;
+  priceSignalRepo?: ReturnType<typeof priceSignalRepoFactory>;
+  priceSignalSalt?: string;
+  priceSignalRateLimit?: { max: number; windowMs: number };
+  /** Invoked after a signal is inserted — run-city uses this to fan out a WS event. */
+  onPriceSignalSet?: (args: { signalId: string; assetCode: string; targetPrice: number; expiresAt: number }) => void;
 }
 
 export interface HttpHandle {
@@ -88,6 +97,9 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
 
   const arenaLimiter: RateLimiter | null = opts.arenaRateLimit
     ? createRateLimiter(opts.arenaRateLimit)
+    : null;
+  const marketLimiter: RateLimiter | null = opts.priceSignalRateLimit
+    ? createRateLimiter(opts.priceSignalRateLimit)
     : null;
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -146,6 +158,57 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       });
 
       return json(res, 202, { attackId, targetAgentId, submittedAt });
+    }
+
+    // ── POST /market/:asset/signal ──────────────────────────────────────
+    const signalPostMatch = req.method === "POST" && req.url
+      ? new URL(req.url, "http://127.0.0.1").pathname.match(/^\/market\/([^/]+)\/signal$/)
+      : null;
+    if (signalPostMatch) {
+      if (!opts.priceSignalRepo || !opts.priceSignalSalt) {
+        return json(res, 503, { error: "market not configured" });
+      }
+      const assetCode = decodeURIComponent(signalPostMatch[1]);
+      const asset = ASSET_REGISTRY.find((a) => a.code === assetCode);
+      if (!asset) return json(res, 404, { error: `unknown asset ${assetCode}` });
+
+      let body: any;
+      try { body = await readJson(req); }
+      catch (e) {
+        const err = e as Error & { code?: string };
+        if (err.code === "BODY_TOO_LARGE") return json(res, 413, { error: "body too large" });
+        return json(res, 400, { error: "invalid JSON" });
+      }
+      const targetPrice = Number(body?.targetPrice);
+      if (!Number.isFinite(targetPrice) || targetPrice < 1 || !Number.isInteger(targetPrice)) {
+        return json(res, 400, { error: "targetPrice required (positive integer minor units)" });
+      }
+      const durationMs = Math.min(60 * 60_000, Math.max(60_000, Number(body?.durationMs ?? 10 * 60_000)));
+      const note = validateSignalNote(body?.note);
+
+      const ip = clientIp(req);
+      const ipH = hashIp(ip, opts.priceSignalSalt);
+      if (marketLimiter) {
+        const r = marketLimiter.check(ipH);
+        if (!r.allowed) {
+          res.writeHead(429, {
+            "content-type": "application/json",
+            "retry-after": String(Math.ceil(r.retryAfterMs / 1000)),
+            ...CORS
+          });
+          return res.end(JSON.stringify({ error: "rate limited", retryAfterMs: r.retryAfterMs }));
+        }
+      }
+
+      const signalId = newPriceSignalId();
+      const setAt = Date.now();
+      const expiresAt = setAt + durationMs;
+      opts.priceSignalRepo.insert({
+        id: signalId, assetCode, targetPrice,
+        setByIpHash: ipH, setAt, expiresAt, note
+      });
+      opts.onPriceSignalSet?.({ signalId, assetCode, targetPrice, expiresAt });
+      return json(res, 202, { signalId, assetCode, targetPrice, setAt, expiresAt, note });
     }
 
     if (req.method !== "GET" || !req.url) {
@@ -322,6 +385,38 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       if (!ag.get(id)) return json(res, 404, { error: `agent ${id} not found` });
       const list = opts.dmRepo.involvingAgent(id, 50);
       return json(res, 200, { agentId: id, dms: list });
+    }
+
+    // ── GET /market/:asset ───────────────────────────────────────────────
+    const marketGetMatch = req.method === "GET" && req.url
+      ? new URL(req.url, "http://127.0.0.1").pathname.match(/^\/market\/([^/]+)$/)
+      : null;
+    if (marketGetMatch) {
+      const assetCode = decodeURIComponent(marketGetMatch[1]);
+      const _asset = ASSET_REGISTRY.find((a) => a.code === assetCode);
+      if (!_asset) return json(res, 404, { error: `unknown asset ${assetCode}` });
+      const signal = opts.priceSignalRepo?.activeFor(assetCode, Date.now()) ?? null;
+
+      // Compute VWAP from the last 100 txs touching this asset within the
+      // last 10 min. Falls back to null if none.
+      let vwap: number | null = null;
+      let samples = 0;
+      try {
+        const txsRes = await opts.ledgerGet(
+          `/transactions?metadata[asset]=${encodeURIComponent(assetCode)}&pageSize=100`
+        );
+        const txsData = extractCursorData(txsRes.body);
+        const rawTxs = Array.isArray(txsData) ? txsData : [];
+        const allSamples = extractSwapSamples(rawTxs, assetCode);
+        const cutoff = Date.now() - 10 * 60_000;
+        const recent = allSamples.filter((s) => s.timestamp >= cutoff);
+        vwap = computeVwap(recent);
+        samples = recent.length;
+      } catch {
+        // non-fatal — vwap stays null
+      }
+
+      return json(res, 200, { assetCode, signal, vwap, samples });
     }
 
     json(res, 404, { error: "not found" });
