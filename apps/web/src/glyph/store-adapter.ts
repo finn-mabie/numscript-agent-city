@@ -60,8 +60,10 @@ export function createGlyphAdapter(): GlyphAdapter {
   const emit = (ev: string, p: AnyGlyphEvent) => {
     const ls = listeners[ev];
     if (ls && ls.size > 0) {
+      if (ev !== "tick") console.log(`[glyph-adapter] emit→${ls.size} listener(s):`, ev, p);
       ls.forEach((fn) => fn(p));
     } else {
+      if (ev !== "tick") console.log(`[glyph-adapter] BUFFER ${ev} (no listener yet)`, p);
       const buf = (buffers[ev] ||= []);
       buf.push(p);
       if (buf.length > BUFFER_CAP) buf.shift();
@@ -73,14 +75,14 @@ export function createGlyphAdapter(): GlyphAdapter {
   const emittedTickIds = new Set<string>();
   const emittedOfferIds = new Set<string>();
 
-  // Hydrate window: every subscriber fire in the first 2s after mount is
+  // Hydrate window: every subscriber fire in the first 800ms after mount is
   // treated as historical-snapshot noise (snapshot + /offers fetches resolve
   // during this window). We mark entries as "already emitted" so they don't
   // flood the canvas, but we do NOT emit them. After the window, everything
-  // is a live event and emits normally. Robust against clock skew and the
-  // split hydrate path (snapshot + offers are two separate store updates).
-  const HYDRATE_WINDOW_MS = 2000;
+  // is a live event and emits normally.
+  const HYDRATE_WINDOW_MS = 800;
   const seedingEndsAt = Date.now() + HYDRATE_WINDOW_MS;
+  console.log(`[glyph-adapter] mounted; hydrate window ${HYDRATE_WINDOW_MS}ms`);
 
   const unsub = useCityStore.subscribe((s, prev) => {
     const isHydrating = Date.now() < seedingEndsAt;
@@ -162,8 +164,11 @@ export function createGlyphAdapter(): GlyphAdapter {
       // where events arrive before the scene / HUD has subscribed.
       const pending = buffers[ev];
       if (pending && pending.length > 0) {
+        console.log(`[glyph-adapter] listener subscribed for ${ev}; flushing ${pending.length} buffered`);
         buffers[ev] = [];
         for (const p of pending) fn(p);
+      } else {
+        console.log(`[glyph-adapter] listener subscribed for ${ev}`);
       }
     },
     off(ev, fn) { listeners[ev]?.delete(fn); },
