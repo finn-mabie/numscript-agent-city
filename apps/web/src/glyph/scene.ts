@@ -357,88 +357,37 @@ export class GlyphScene extends Phaser.Scene {
     this.receipts.push({ container: c, bornAt: this.time.now, duration: 1800 });
   }
 
-  private onReject({ from, to, amount, txid, barrier, detail }: GlyphRejectEvent) {
-    // Center-ish on rejection site — between sender and target
-    const judyPos = this.agentPos(from);
-    // to may be a zone code (e.g. "BNK") or an agent id (e.g. "004")
-    const targetPos = (GLYPH_ZONES as Record<string, unknown>)[to]
-      ? this.zoneCenter(to)
-      : this.agentPos(to);
-    const cx = (judyPos.x + targetPos.x) / 2;
-    const cy = (judyPos.y + targetPos.y) / 2;
+  private onReject({ from, barrier }: GlyphRejectEvent) {
+    // Subtle, compact rejection marker at the sender's feet. The big framed
+    // "_CAGE/ BARRIER ENGAGED_" dialog was too in-your-face for a city that
+    // produces 40+ events/minute — rejects should be persistent-ish in the
+    // log rail but visually quick on the canvas.
+    const fromPos = this.agentPos(from);
 
-    const cfgMap = {
-      schema:    { color: COLORS.teal,  sigil: "⬡",   code: "E/SCHEMA", title: "Schema rejection",
-                   rows: [["field", detail.field], ["want", detail.want], ["got", detail.got, COLORS.red]] as [string, string | number, string?][] },
-      overdraft: { color: COLORS.red,   sigil: "⊘",   code: "E/⊘",      title: "Overdraft rejection",
-                   rows: [["debit", `$${detail.debit}`, COLORS.red], ["avail", "$0"], ["short", `$${detail.short}`, COLORS.red]] as [string, string | number, string?][] },
-      unknown:   { color: COLORS.amber, sigil: "404", code: "E/404",    title: "Template not found",
-                   rows: [["tmpl", detail.tmpl, COLORS.red], ["known", "posting, hold"], ["hint", "register it"]] as [string, string | number, string?][] },
-      seen:      { color: COLORS.lilac, sigil: "⟳",   code: "E/IDEM",   title: "Already seen",
-                   rows: [["nonce", detail.nonce], ["first", `tick ${detail.first}`], ["effect", "no-op"]] as [string, string | number, string?][] },
-    } as const;
-
+    const cfgMap: Record<GlyphRejectEvent["barrier"], { color: string; sigil: string }> = {
+      schema:    { color: COLORS.teal,  sigil: "⬡" },
+      overdraft: { color: COLORS.red,   sigil: "⊘" },
+      unknown:   { color: COLORS.amber, sigil: "404" },
+      seen:      { color: COLORS.lilac, sigil: "⟳" },
+    };
     const cfg = cfgMap[barrier];
-
-    const c = this.add.container(cx, cy);
-    c.setAngle(-1.5);
-
     const colorInt = Phaser.Display.Color.HexStringToColor(cfg.color).color;
-    const bg = this.add.rectangle(0, 0, 260, 130, 0x011e22, 1)
-      .setStrokeStyle(1.5, colorInt).setOrigin(0.5);
-    const titleBar = this.add.rectangle(-130, -65, 260, 18, colorInt, 1).setOrigin(0, 0);
-    const titleTxt = this.add.text(-124, -62, "_CAGE/ BARRIER ENGAGED", {
-      fontFamily: FONT, fontSize: "8px", color: "#011E22", letterSpacing: 1.2,
-    }).setResolution(2);
-    const titleCode = this.add.text(124, -62, cfg.code, {
-      fontFamily: FONT, fontSize: "8px", color: "#011E22", letterSpacing: 1.2,
-    }).setResolution(2).setOrigin(1, 0);
 
-    const sigil = this.add.text(-120, -35, cfg.sigil, {
-      fontFamily: FONT, fontSize: "28px", color: cfg.color,
-    }).setResolution(2);
-    const heading = this.add.text(-80, -32, cfg.title, {
-      fontFamily: FONT, fontSize: "13px", color: COLORS.ink,
-    }).setResolution(2);
-    const subline = this.add.text(-80, -16, `LEDGER REFUSED · TX ${txid}`, {
-      fontFamily: FONT, fontSize: "8px", color: COLORS.inkDim, letterSpacing: 1.2,
-    }).setResolution(2);
-
-    const rows = cfg.rows.flatMap((r, i) => {
-      const k = this.add.text(-120, 6 + i * 16, String(r[0]).padEnd(8), {
-        fontFamily: FONT, fontSize: "10px", color: COLORS.inkDim,
-      }).setResolution(2);
-      const v = this.add.text(-56, 6 + i * 16, String(r[1]), {
-        fontFamily: FONT, fontSize: "10px", color: r[2] ?? COLORS.ink,
-      }).setResolution(2);
-      return [k, v];
-    });
-
-    // Footer line: resolved from sender agent record
-    const sender = glyphAgentById(from);
-    const bySig = this.add.text(-120, 54, "by", {
-      fontFamily: FONT, fontSize: "10px", color: COLORS.inkDim,
-    }).setResolution(2);
-    const byVal = this.add.text(-56, 54, sender ? `${sender.glyph} ${sender.name}` : from, {
-      fontFamily: FONT, fontSize: "10px", color: COLORS.red,
-    }).setResolution(2);
-
-    c.add([bg, titleBar, titleTxt, titleCode, sigil, heading, subline, ...rows, bySig, byVal]);
-    c.setScale(0.8);
+    // Small pill: sigil + short label, drifts up and fades. ~1s total.
+    const c = this.add.container(fromPos.x, fromPos.y - 22);
+    const bg = this.add.rectangle(0, 0, 42, 16, 0x011e22, 0.92)
+      .setStrokeStyle(1, colorInt).setOrigin(0.5);
+    const label = this.add.text(0, 0, cfg.sigil, {
+      fontFamily: FONT, fontSize: "10px", color: cfg.color,
+    }).setResolution(2).setOrigin(0.5);
+    c.add([bg, label]);
     c.setAlpha(0);
-    this.tweens.add({
-      targets: c, scale: 1, alpha: 1, duration: 180, ease: "Back.easeOut",
-    });
-    this.barriers.push({ container: c, bornAt: this.time.now, duration: 2800 });
 
-    // Give the whole target zone a red pulse (only if to is a zone code)
-    const z = (GLYPH_ZONES as Record<string, { x: number; y: number; w: number; h: number } | undefined>)[to];
-    if (z) {
-      const pulse = this.add.rectangle(z.x, z.y, z.w, z.h, 0xe5534b, 0.18).setOrigin(0, 0);
-      this.tweens.add({
-        targets: pulse, alpha: 0, duration: 650,
-        onComplete: () => pulse.destroy(),
-      });
-    }
+    this.tweens.add({ targets: c, alpha: 1, duration: 120 });
+    this.tweens.add({
+      targets: c, y: c.y - 10, alpha: 0,
+      delay: 500, duration: 400, ease: "cubic.in",
+    });
+    this.barriers.push({ container: c, bornAt: this.time.now, duration: 1000 });
   }
 }

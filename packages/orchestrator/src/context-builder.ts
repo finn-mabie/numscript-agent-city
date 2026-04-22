@@ -94,13 +94,24 @@ export function buildContext(input: ContextInput): BuiltContext {
     ``,
     `If you are NOT Heidi, do not attempt revenue_split. If you are NOT Ivan, do not attempt dispute_arbitration. If you want to be PAID for a job, you cannot self-settle — you must post_offer to advertise and wait for the payer to invoke gig_settlement.`,
     ``,
-    `━━━ HOW TO CHOOSE YOUR ACTION ━━━`,
-    `1. READ THE BOARD FIRST. If someone has posted an offer you can plausibly fulfill AS THE PAYER or AS THE INITIATOR (not as the worker), CLOSE IT by invoking the matching template with the offer id inside \`memo\` (e.g. memo: "settling off_xxx — delivering the writing"). This is the highest-signal thing you can do; the cage will wire it into an on-ledger audit trail.`,
-    `2. If no open offer matches but you have a clear earning/trading opportunity with another agent, CALL THE TEMPLATE DIRECTLY using ${selfAcct} as the source param listed above.`,
-    `3. Only if (1) and (2) don't apply, consider \`post_offer\` to advertise a service or request. DO NOT repeat an offer you already made this session — one post is enough to reach the whole city.`,
-    `4. If genuinely nothing sensible to do, call \`idle\`.`,
+    `━━━ YOU NEED TO CLOSE DEALS, NOT JUST ADVERTISE ━━━`,
+    `Posting offers alone is WORTHLESS. The demo fails if everyone posts and nobody transacts. Every tick you must ask: "Can I BUY something right now from another agent's offer?"`,
     ``,
-    `post_offer is a conversation starter, not a deal. A healthy city is 20-30% post_offer and 40-60% template calls — if everyone is just posting, nothing is actually happening on the ledger.`
+    `Agents are MUTUAL CUSTOMERS. You are not only a service provider — you also need services from other agents. Examples:`,
+    `  • Alice (Market-Maker) pays Bob (Courier) to move inventory → \`gig_settlement(payer=Alice, winner=Bob)\``,
+    `  • Frank (Writer) pays Eve (Researcher) for data → \`api_call_fee(caller=Frank, provider=Eve)\``,
+    `  • Grace (Illustrator) pays Frank (Writer) for copy to illustrate → \`gig_settlement(payer=Grace, winner=Frank)\``,
+    `  • Any agent pays Dave (Lender) a subscription for credit access → \`subscription_charge(subscriber=you, provider=Dave)\``,
+    `  • Heidi (Pool-Keeper) pays all agents yield → \`revenue_split(pool=@platform:pool:liquidity-main, recipients=...)\` (Heidi only)`,
+    ``,
+    `━━━ HOW TO CHOOSE YOUR ACTION (in priority order) ━━━`,
+    `1. BE A CUSTOMER. Scan the board for a peer offering a service YOU could use. If you have budget (balance > \$30) and the service looks reasonable (compare per-call price or gig fee to what peers are offering), CLOSE their offer by invoking the matching template with you as the payer/caller/subscriber. Put the offer id in your \`memo\` so the thread closes on-ledger. Every peer transaction you close builds trust that compounds next tick.`,
+    `2. BE A SERVICE PROVIDER with pending demand. If you are the role needed to close an existing offer (e.g., you are Heidi and someone asked for revenue split, or you are Ivan and escrow needs arbitration), invoke the matching template.`,
+    `3. Post an offer ONLY if the board has nothing worth closing AND you haven't posted in the last 3 ticks. One post per hour is enough to reach the city. Repeating your ad wastes tokens and pollutes the feed.`,
+    `4. idle if genuinely nothing sensible to do — e.g. you just transacted, the board is empty of matching offers, and you're not owed anything.`,
+    ``,
+    `WRONG: \"I'll post that I'm open for business again, in case someone missed it.\" The whole city already sees your offer for 5 minutes. Repeat posting is noise.`,
+    `RIGHT: \"Frank posted 'need research @ \$3'. I'm Eve, research is my job, his offer doesn't need me to initiate — BUT I can proactively pay Dave \$5 subscription for a credit line I'll need next week.\" → subscription_charge(subscriber=me, provider=Dave).`
   ].filter(Boolean).join("\n");
 
   const now = input.nowMs ?? Date.now();
