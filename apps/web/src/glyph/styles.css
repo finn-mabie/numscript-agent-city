@@ -1,0 +1,609 @@
+/* ============================================================================
+   Glyph City — design-system reference sheet
+   Dark emerald data-room. Monospace grid. Ink Berkeley Mono with Polymath
+   Display for headers only. Dissolves the chrome — every surface is the grid.
+   ============================================================================ */
+
+@font-face {
+  font-family: 'Polymath Display';
+  src: url('./fonts/PolymathDisp-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Polymath Display';
+  src: url('./fonts/PolymathDisp-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Polymath Text';
+  src: url('./fonts/PolymathText-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('./fonts/BerkeleyMonoVariable.woff2') format('woff2');
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+
+:root {
+  /* Canvas palette — emerald is the sky, slate is the ink */
+  --sky:        #01353C;        /* canvas background */
+  --sky-deep:   #011E22;        /* panel fills, deepest shadows */
+  --sky-800:    #012A30;        /* chrome / header strip */
+  --sky-700:    #023740;        /* card fills behind dense glyph blocks */
+  --sky-rule:   #0a4048;        /* hairline rules */
+
+  --ink:        #D5E1E1;        /* slate-100 — primary glyphs */
+  --ink-soft:   #A6BEC0;        /* slate-400 — secondary glyphs */
+  --ink-dim:    #7A9396;        /* slate-500 — labels, meta */
+  --ink-ghost:  #486568;        /* slate-600 — grid dots, whispers */
+
+  --gold:       #D4A24A;        /* root-offer, active transaction, cage gold */
+  --gold-soft:  #8B7537;        /* gold at rest */
+  --silver:     #A6BEC0;        /* reply bubbles, cold commits */
+
+  --mint:       #BAEABC;        /* committed */
+  --mint-dim:   #749B76;
+
+  --scream:     #E5534B;        /* Judy, overdraft, destructive */
+  --scream-soft:#8B3632;
+
+  --schema:     #60D6CE;        /* teal hex — schema rejection */
+  --unknown:    #E8A84A;        /* 404 — unknown template */
+  --seen:       #B79BD9;        /* already-seen — idempotency */
+
+  /* Agent signature hues */
+  --a-alice: #D4A24A;   /* gold — market-maker */
+  --a-bob:   #60D6CE;   /* teal — courier */
+  --a-carol: #BAEABC;   /* mint — inspector */
+  --a-dave:  #8CB8D6;   /* cobalt — lender */
+  --a-eve:   #B79BD9;   /* lilac — researcher */
+  --a-frank: #E8A84A;   /* amber — writer */
+  --a-grace: #F5B8C8;   /* pink — illustrator */
+  --a-heidi: #7FD6A8;   /* seafoam — pool-keeper */
+  --a-ivan:  #C9B892;   /* sand — disputant */
+  --a-judy:  #E5534B;   /* red — the red agent */
+
+  --font-display: 'Polymath Display', ui-serif, Georgia, serif;
+  --font-text:    'Polymath Text', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    'Berkeley Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --cell: 12px;            /* base grid cell for glyph layout */
+  --doc-max: 1440px;
+  --pad: 56px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--sky);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  /* The underlying grid — dotted emerald-on-emerald. Subtle but always present. */
+  background-image:
+    radial-gradient(circle, rgba(213,225,225,0.05) 1px, transparent 1.25px);
+  background-size: 12px 12px;
+  background-position: 0 0;
+}
+
+/* ============================================================================
+   TYPOGRAPHY
+   ============================================================================ */
+
+.mono     { font-family: var(--font-mono); }
+.disp     { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.01em; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.eyebrow::before { content: '_'; color: var(--gold-soft); margin-right: 1px; }
+.eyebrow::after  { content: '/'; color: var(--gold-soft); margin-left: 1px; }
+
+h1 { font: 500 clamp(56px, 7vw, 104px)/0.94 var(--font-display); letter-spacing: -0.025em; margin: 0; color: var(--ink); }
+h2 { font: 500 clamp(32px, 3.4vw, 52px)/1.04 var(--font-display); letter-spacing: -0.012em; margin: 0; color: var(--ink); }
+h3 { font: 500 22px/1.2 var(--font-display); margin: 0; color: var(--ink); }
+h4 { font: 400 11px/1 var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; margin: 0; color: var(--ink-dim); }
+p  { margin: 0; color: color-mix(in srgb, var(--ink) 86%, transparent); font-family: var(--font-text); }
+p + p { margin-top: 10px; }
+
+strong { color: var(--ink); font-weight: 500; }
+
+/* ============================================================================
+   PAGE CHROME — dissolved. No boxes around boxes; sections meet at a hairline.
+   ============================================================================ */
+
+.page { max-width: var(--doc-max); margin: 0 auto; padding: 48px var(--pad) 140px; }
+
+.page-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 32px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--sky-rule);
+  margin-bottom: 48px;
+}
+.page-header .eyebrow { margin-bottom: 18px; }
+.page-header .lede {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(18px, 1.55vw, 22px);
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ink) 78%, transparent);
+  max-width: 64ch;
+  margin-top: 22px;
+}
+.page-header .meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  text-align: right;
+  line-height: 1.9;
+}
+.page-header .meta .k { color: var(--ink-ghost); }
+.page-header .meta .v { color: var(--ink); margin-left: 10px; }
+
+/* Sections — no cards, just rules */
+section.sheet {
+  margin-top: 96px;
+  border-top: 1px solid var(--sky-rule);
+  padding-top: 40px;
+}
+.sheet-head {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 20px;
+  align-items: baseline;
+  margin-bottom: 24px;
+}
+.sheet-head .idx {
+  font: 500 48px/1 var(--font-display);
+  color: var(--ink-ghost);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.sheet-head .idx .sub {
+  display: block;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  color: var(--ink-ghost);
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+.sheet-head h2 { margin-bottom: 10px; }
+.sheet-head .lead {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--ink) 78%, transparent);
+  max-width: 58ch;
+}
+.sheet-head .right-tag {
+  font: 400 10px/1.4 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-align: right;
+}
+.sheet-head .right-tag .hot { color: var(--gold); }
+
+/* Hairline "24-col" ruler that appears just under each sheet head */
+.ruler {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  height: 8px;
+  margin-bottom: 24px;
+}
+.ruler span {
+  border-right: 1px solid var(--sky-rule);
+  height: 100%;
+}
+.ruler span:last-child { border-right: 0; }
+
+/* ============================================================================
+   HERO STILL — the barrier-slam. A single big SVG.
+   ============================================================================ */
+
+.hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--sky-deep);
+  border: 1px solid var(--sky-rule);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.hero svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hero .cap {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 12px 18px;
+  display: flex; justify-content: space-between; align-items: center;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: linear-gradient(to top, rgba(1,30,34,0.85), transparent 70%);
+  pointer-events: none;
+}
+.hero .cap .r { color: var(--scream); }
+
+/* ============================================================================
+   GRID SURFACES — for the roster, lexicon, barriers, etc.
+   ============================================================================ */
+
+.row {
+  display: grid;
+  gap: 0;
+  margin-top: 12px;
+  border: 1px solid var(--sky-rule);
+}
+.row--agents { grid-template-columns: repeat(5, 1fr); }
+.row--agents > .cell { border-right: 1px solid var(--sky-rule); border-bottom: 1px solid var(--sky-rule); }
+.row--agents > .cell:nth-child(5n) { border-right: 0; }
+.row--agents > .cell:nth-last-child(-n+5) { border-bottom: 0; }
+
+.row--buildings { grid-template-columns: repeat(3, 1fr); }
+.row--buildings > .cell { border-right: 1px solid var(--sky-rule); border-bottom: 1px solid var(--sky-rule); }
+.row--buildings > .cell:nth-child(3n) { border-right: 0; }
+.row--buildings > .cell:nth-last-child(-n+3) { border-bottom: 0; }
+
+.row--barriers { grid-template-columns: repeat(2, 1fr); }
+.row--barriers > .cell { border-right: 1px solid var(--sky-rule); border-bottom: 1px solid var(--sky-rule); }
+.row--barriers > .cell:nth-child(2n) { border-right: 0; }
+.row--barriers > .cell:nth-last-child(-n+2) { border-bottom: 0; }
+
+.cell { padding: 24px; background: var(--sky-deep); position: relative; }
+
+/* ============================================================================
+   AGENT CELL
+   ============================================================================ */
+
+.agent {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 220px;
+  gap: 12px;
+  position: relative;
+}
+.agent .glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 120px;
+  line-height: 1;
+  color: var(--ac, var(--ink));
+  text-shadow: 0 0 32px color-mix(in srgb, var(--ac, var(--ink)) 25%, transparent);
+}
+.agent .meta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sky-rule);
+}
+.agent .meta .id {
+  font: 500 22px/1 var(--font-display);
+  color: var(--ac, var(--ink));
+  letter-spacing: -0.01em;
+}
+.agent .meta .pair {
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-align: right;
+}
+.agent .meta .role {
+  grid-column: 1 / -1;
+  font: 400 11px/1.3 var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.agent .meta .swatch {
+  position: absolute;
+  top: 24px; right: 24px;
+  width: 14px; height: 14px;
+  background: var(--ac);
+}
+
+/* Red agent (Judy) — subtle corruption */
+.agent--red .glyph { text-shadow: 0 0 32px color-mix(in srgb, var(--scream) 45%, transparent); }
+.agent--red::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg,
+      transparent 0, transparent 22px,
+      color-mix(in srgb, var(--scream) 8%, transparent) 22px,
+      color-mix(in srgb, var(--scream) 8%, transparent) 23px);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   BUILDING CELL
+   ============================================================================ */
+
+.building {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
+  min-height: 260px;
+  position: relative;
+}
+.building .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bc, var(--ink));
+}
+.building .tag::before { content: '_'; color: var(--ink-ghost); }
+.building .tag::after  { content: '/'; color: var(--ink-ghost); }
+.building .ascii {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.05;
+  white-space: pre;
+  color: var(--bc, var(--ink));
+  text-shadow: 0 0 16px color-mix(in srgb, var(--bc, var(--ink)) 18%, transparent);
+  align-self: center;
+  /* tint zone behind the ASCII */
+  padding: 14px 12px;
+  background: color-mix(in srgb, var(--bc, var(--ink)) 7%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--bc, var(--ink)) 25%, transparent);
+  overflow: hidden;
+}
+.building .foot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sky-rule);
+}
+.building .foot .name {
+  font: 500 20px/1 var(--font-display);
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.building .foot .capacity {
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  text-align: right;
+}
+.building .foot .desc {
+  grid-column: 1 / -1;
+  font: 400 11px/1.4 var(--font-mono);
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================================
+   RECEIPT (coin-flow vocabulary)
+   ============================================================================ */
+
+.receipts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 12px;
+}
+.receipt {
+  background: var(--sky-deep);
+  border: 1px solid var(--sky-rule);
+  padding: 20px 22px;
+  position: relative;
+}
+.receipt .h {
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 14px;
+}
+.receipt .body {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre;
+}
+.receipt .body .amt   { color: var(--gold); font-weight: 500; }
+.receipt .body .from  { color: var(--ink-soft); }
+.receipt .body .to    { color: var(--ink); }
+.receipt .body .ok    { color: var(--mint); }
+.receipt .body .bad   { color: var(--scream); }
+.receipt .body .tx    { color: var(--ink-dim); }
+.receipt .body .dim   { color: var(--ink-dim); }
+
+.receipt .pin {
+  position: absolute;
+  left: -1px; top: 20px; bottom: 20px;
+  width: 2px;
+  background: var(--ac, var(--gold));
+}
+.receipt.reject .pin { background: var(--scream); }
+
+/* ============================================================================
+   BARRIER DIALOGS
+   ============================================================================ */
+
+.barrier {
+  background: var(--sky-deep);
+  padding: 24px 28px;
+  position: relative;
+}
+.barrier .dialog {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  white-space: pre;
+  display: inline-block;
+}
+.barrier .dialog .t   { color: var(--bc, var(--schema)); }
+.barrier .dialog .lbl { color: var(--ink-dim); }
+.barrier .dialog .val { color: var(--ink); }
+.barrier .dialog .bad { color: var(--scream); }
+.barrier .caption {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding-top: 14px;
+  border-top: 1px dashed var(--sky-rule);
+}
+.barrier .caption .name { font: 500 18px/1 var(--font-display); color: var(--ink); }
+.barrier .caption .code { font: 400 11px/1 var(--font-mono); letter-spacing: 0.14em; color: var(--bc); }
+.barrier .caption .notes { grid-column: 1 / -1; font: 400 11px/1.4 var(--font-mono); color: var(--ink-soft); letter-spacing: 0.04em; }
+
+/* ============================================================================
+   TOKENS STRIP
+   ============================================================================ */
+
+.tokens {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1fr;
+  gap: 32px;
+  margin-top: 12px;
+  border: 1px solid var(--sky-rule);
+  padding: 28px;
+  background: var(--sky-deep);
+}
+.tokens h4 { margin-bottom: 14px; }
+.tokens .palette {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  border: 1px solid var(--sky-rule);
+}
+.tokens .sw {
+  aspect-ratio: 1;
+  padding: 10px;
+  display: flex; align-items: flex-end;
+  font: 400 9px/1.1 var(--font-mono);
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.7);
+}
+.tokens .type-sample {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.tokens .type-sample .disp-xl { font: 500 42px/1 var(--font-display); color: var(--ink); letter-spacing: -0.02em; display: block; margin-bottom: 6px; }
+.tokens .type-sample .mono-lb { color: var(--ink-dim); letter-spacing: 0.14em; text-transform: uppercase; font-size: 10px; display: block; margin-top: 12px; }
+.tokens .grid-tokens {
+  font: 400 12px/1.6 var(--font-mono);
+  color: var(--ink-soft);
+}
+.tokens .grid-tokens b { color: var(--ink); font-weight: 500; }
+
+/* ============================================================================
+   CANVAS MID-SHOT (second big still — the village at rest)
+   ============================================================================ */
+
+.canvas-still {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  background: var(--sky-deep);
+  border: 1px solid var(--sky-rule);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.canvas-still svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.canvas-still .cap {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 12px 18px;
+  display: flex; justify-content: space-between;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim);
+  background: linear-gradient(to top, rgba(1,30,34,0.8), transparent 70%);
+}
+
+/* ============================================================================
+   CHROME DISSOLUTION (the page as it'd look with panels)
+   ============================================================================ */
+
+.chrome-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--sky-deep);
+  border: 1px solid var(--sky-rule);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.chrome-preview svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ============================================================================
+   FOOTER
+   ============================================================================ */
+
+.page-footer {
+  margin-top: 120px;
+  padding-top: 28px;
+  border-top: 1px solid var(--sky-rule);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  font: 400 11px/1.6 var(--font-mono);
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+.page-footer .left { color: var(--ink-soft); }
+.page-footer a { color: var(--ink); border: 0; text-decoration: none; }
+
+/* ============================================================================
+   TWO-COL BLOCK (prose next to a sidebar)
+   ============================================================================ */
+
+.twocol {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 48px;
+  margin-top: 12px;
+}
+@media (max-width: 900px) {
+  .twocol { grid-template-columns: 1fr; gap: 24px; }
+}
+.twocol .prose p { font-size: 15px; line-height: 1.6; color: color-mix(in srgb, var(--ink) 82%, transparent); }
+.twocol .prose p + p { margin-top: 14px; }
+
+.aside {
+  background: var(--sky-deep);
+  border: 1px solid var(--sky-rule);
+  padding: 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.aside h4 { margin-bottom: 14px; }
+.aside ul { margin: 0; padding-left: 18px; }
+.aside li { padding: 3px 0; }
+.aside .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 11px; letter-spacing: 0.04em; }
+.aside .kv dt { color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
+.aside .kv dd { margin: 0; color: var(--ink); }
