@@ -73,20 +73,20 @@ export function createGlyphAdapter(): GlyphAdapter {
   const emittedTickIds = new Set<string>();
   const emittedOfferIds = new Set<string>();
 
-  // The first subscriber fire is typically triggered by /snapshot hydrate,
-  // which floods ~200 historical entries into the store. We don't want to
-  // replay the whole history as a flood of receipts/barriers on page load.
-  // Instead, on first fire we mark everything as "already emitted" silently,
-  // then start streaming from the next update onward.
-  let seeded = false;
+  // Hydrate window: every subscriber fire in the first 2s after mount is
+  // treated as historical-snapshot noise (snapshot + /offers fetches resolve
+  // during this window). We mark entries as "already emitted" so they don't
+  // flood the canvas, but we do NOT emit them. After the window, everything
+  // is a live event and emits normally. Robust against clock skew and the
+  // split hydrate path (snapshot + offers are two separate store updates).
+  const HYDRATE_WINDOW_MS = 2000;
+  const seedingEndsAt = Date.now() + HYDRATE_WINDOW_MS;
 
   const unsub = useCityStore.subscribe((s, prev) => {
-    if (!seeded) {
+    const isHydrating = Date.now() < seedingEndsAt;
+    if (isHydrating) {
       for (const r of s.recent) emittedTickIds.add(r.tickId);
       for (const id of Object.keys(s.offers)) emittedOfferIds.add(id);
-      seeded = true;
-      // Still emit one tick snapshot so the rails show the current counters
-      // right away (not stuck at 0 until the next event).
       emit("tick", {
         tick: s.ticksToday,
         commits: s.committedToday,
