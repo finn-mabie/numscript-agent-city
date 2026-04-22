@@ -13,4 +13,4 @@ INSERT OR IGNORE INTO assets (code, label, emoji, hex, decimals, unit_label, is_
   ('USD/2',          'US Dollar',     '🇺🇸', '#BAEABC', 2, '$',  1, NULL),
   ('EUR/2',          'Euro',          '🇪🇺', '#8CB8D6', 2, '€',  1, NULL),
   ('STRAWBERRY/0',   'Strawberry',    '🍓', '#F5B8C8', 0, '🍓', 0, 200),
-  ('COMPUTE_HOUR/0', 'Compute Hour',  '💻', '#60D6CE', 0, '💻', 0, 50);
+  ('COMPUTEHOUR/0',  'Compute Hour',  '💻', '#60D6CE', 0, '💻', 0, 50);

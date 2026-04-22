@@ -6,7 +6,7 @@
 
 Two tightly-coupled features that, together, turn the city from "watch 10 agents transact USD" into "watch a live mini-economy respond to you."
 
-**Phase 1 — multi-asset plumbing (Plan 8).** Agents trade not only USD but also EUR, STRAWBERRIES, and COMPUTE_HOUR. Formance Ledger is asset-agnostic by design — this feature exists mostly to showcase that, *not* to add financial complexity.
+**Phase 1 — multi-asset plumbing (Plan 8).** Agents trade not only USD but also EUR, STRAWBERRIES, and COMPUTEHOUR. Formance Ledger is asset-agnostic by design — this feature exists mostly to showcase that, *not* to add financial complexity.
 
 **Phase 2 — price discovery (Plan 9).** A visitor sets a "target price" for an asset (e.g., "strawberries are now \$5/unit until 9pm"). Agents see the target vs the live market price (computed as trailing-window VWAP over recent trades) and arbitrage the gap. The visitor watches the market self-correct on-ledger, with a live price sparkline in the HUD.
 
@@ -38,7 +38,7 @@ New sqlite table `assets`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS assets (
-  code           TEXT PRIMARY KEY,           -- "USD/2", "EUR/2", "STRAWBERRY/0", "COMPUTE_HOUR/0"
+  code           TEXT PRIMARY KEY,           -- "USD/2", "EUR/2", "STRAWBERRY/0", "COMPUTEHOUR/0"
   label          TEXT NOT NULL,              -- "US Dollar", "Strawberry", etc.
   emoji          TEXT,                       -- "🇺🇸", "🍓", "🇪🇺", "💻"
   hex            TEXT NOT NULL,              -- coin-trail color in UI
@@ -56,7 +56,7 @@ Seed at genesis:
 | `USD/2` | US Dollar | 🇺🇸 | 2 | (no cap) |
 | `EUR/2` | Euro | 🇪🇺 | 2 | (no cap) |
 | `STRAWBERRY/0` | Strawberries | 🍓 | 0 | 200 (scarce) |
-| `COMPUTE_HOUR/0` | Compute Hour | 💻 | 0 | 50 (scarce) |
+| `COMPUTEHOUR/0` | Compute Hour | 💻 | 0 | 50 (scarce) |
 
 ### 5.2 Price-signals table (Plan 9)
 
@@ -131,16 +131,16 @@ Your balances (by asset):
   USD/2:         $10.32
   EUR/2:         €5.00
   STRAWBERRY/0:  3 🍓
-  COMPUTE_HOUR/0: 0 💻
+  COMPUTEHOUR/0: 0 💻
 
 Market prices (last 5 min VWAP, trailing):
   🍓 STRAWBERRY: $1.20 / unit     (target: $5.00 until 8:45pm — driven by visitor)
-  💻 COMPUTE_HOUR: $8.00 / hr     (no target — market rate)
+  💻 COMPUTEHOUR: $8.00 / hr     (no target — market rate)
   €1 EUR ≈ $1.08 USD              (from recent swaps)
 
 Scarcity:
   🍓 STRAWBERRY: 47/200 circulating (6 held by Frank, 12 by Heidi's pool)
-  💻 COMPUTE_HOUR: 50/50 available (no scarcity pressure)
+  💻 COMPUTEHOUR: 50/50 available (no scarcity pressure)
 ```
 
 Injected before the "What's your next move?" line. Clear, tabular, sub-100-tokens.
@@ -154,9 +154,9 @@ Light flavor layer — each agent has an **asset preference** that biases their 
 | Alice (Market-Maker) | All currencies — quotes spreads |
 | Bob (Courier) | Accepts any asset for gig fees |
 | Dave (Lender) | USD / EUR only; no commodity credit lines in v1 |
-| Eve (Researcher) | Will accept COMPUTE_HOUR as payment |
+| Eve (Researcher) | Will accept COMPUTEHOUR as payment |
 | Frank (Writer) | Accepts STRAWBERRY tips (flavor) |
-| Grace (Illustrator) | STRAWBERRY or COMPUTE_HOUR tips |
+| Grace (Illustrator) | STRAWBERRY or COMPUTEHOUR tips |
 | Heidi (Pool-Keeper) | Runs a STRAWBERRY yield pool |
 | Ivan (Disputant) | USD only |
 | Judy (Red Agent) | Probes cross-asset attacks (e.g., try to swap €10 for $1M) |
@@ -245,7 +245,7 @@ Mirrors arena (Plan 4):
 
 ### Plan 8 — multi-asset plumbing (MVP ~1 day)
 
-1. Assets table + seed genesis with USD, EUR, STRAWBERRY, COMPUTE_HOUR
+1. Assets table + seed genesis with USD, EUR, STRAWBERRY, COMPUTEHOUR
 2. `commodity_swap` template + schema + example
 3. `AGENT_ASSET_PREF` map + roster taglines tweaked
 4. Context-builder: per-asset balances + preferences block

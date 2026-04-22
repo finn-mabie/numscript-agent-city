@@ -116,7 +116,8 @@ set_tx_meta("asset", "STRAWBERRY/0")`,
   else console.error(`seed strawberry ${id}: ${r.code} ${r.message}`);
 }
 
-// COMPUTE_HOUR — also scarce (50 total). Eve (researcher) gets most.
+// COMPUTEHOUR — also scarce (50 total). Eve (researcher) gets most.
+// (Numscript's lexer rejects `_` in asset codes, so we flatten to COMPUTEHOUR/0.)
 const computeAllocation: Record<string, number> = {
   "005": 30, "006": 5, "007": 5, "008": 5, "001": 5
 };
@@ -131,7 +132,7 @@ for (const id of agents) {
 )
 set_tx_meta("type", "GENESIS_SEED")
 set_tx_meta("agent", "${id}")
-set_tx_meta("asset", "COMPUTE_HOUR/0")`,
+set_tx_meta("asset", "COMPUTEHOUR/0")`,
     vars: {},
     reference: ref
   });

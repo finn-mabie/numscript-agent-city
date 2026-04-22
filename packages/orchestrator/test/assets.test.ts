@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { ASSET_REGISTRY, assetByCode, formatAmount, isCommodity } from "../src/assets.js";
 
 describe("ASSET_REGISTRY", () => {
-  it("seeds USD, EUR, STRAWBERRY, COMPUTE_HOUR", () => {
+  it("seeds USD, EUR, STRAWBERRY, COMPUTEHOUR", () => {
     expect(ASSET_REGISTRY.map((a) => a.code).sort()).toEqual([
-      "COMPUTE_HOUR/0", "EUR/2", "STRAWBERRY/0", "USD/2"
+      "COMPUTEHOUR/0", "EUR/2", "STRAWBERRY/0", "USD/2"
     ]);
   });
   it("USD has 2 decimals; STRAWBERRY has 0", () => {
@@ -14,7 +14,7 @@ describe("ASSET_REGISTRY", () => {
   it("scarce commodities have totalSupply; currencies don't", () => {
     expect(assetByCode("USD/2")?.totalSupply).toBeNull();
     expect(assetByCode("STRAWBERRY/0")?.totalSupply).toBe(200);
-    expect(assetByCode("COMPUTE_HOUR/0")?.totalSupply).toBe(50);
+    expect(assetByCode("COMPUTEHOUR/0")?.totalSupply).toBe(50);
   });
 });
 
@@ -28,8 +28,8 @@ describe("formatAmount", () => {
   it("STRAWBERRY → 3 🍓", () => {
     expect(formatAmount("STRAWBERRY/0", 3)).toBe("3 🍓");
   });
-  it("COMPUTE_HOUR → 2 💻", () => {
-    expect(formatAmount("COMPUTE_HOUR/0", 2)).toBe("2 💻");
+  it("COMPUTEHOUR → 2 💻", () => {
+    expect(formatAmount("COMPUTEHOUR/0", 2)).toBe("2 💻");
   });
   it("unknown asset falls back to raw", () => {
     expect(formatAmount("MYSTERY/9", 42)).toBe("42 MYSTERY/9");

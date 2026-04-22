@@ -15,7 +15,7 @@ export const ASSET_REGISTRY: Asset[] = [
   { code: "USD/2",          label: "US Dollar",     emoji: "🇺🇸", hex: "#BAEABC", decimals: 2, unitLabel: "$", prefix: true,  isCurrency: true,  totalSupply: null },
   { code: "EUR/2",          label: "Euro",          emoji: "🇪🇺", hex: "#8CB8D6", decimals: 2, unitLabel: "€", prefix: true,  isCurrency: true,  totalSupply: null },
   { code: "STRAWBERRY/0",   label: "Strawberry",    emoji: "🍓", hex: "#F5B8C8", decimals: 0, unitLabel: "🍓", prefix: false, isCurrency: false, totalSupply: 200 },
-  { code: "COMPUTE_HOUR/0", label: "Compute Hour",  emoji: "💻", hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false, isCurrency: false, totalSupply: 50 }
+  { code: "COMPUTEHOUR/0",  label: "Compute Hour",  emoji: "💻", hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false, isCurrency: false, totalSupply: 50 }
 ];
 
 const BY_CODE = new Map(ASSET_REGISTRY.map((a) => [a.code, a]));

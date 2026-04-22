@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Phase 8 adds multi-asset ledgering (USD, EUR, STRAWBERRY, COMPUTE_HOUR) with a new `commodity_swap` template and asset-aware visuals. Phase 9 layers on top: visitor sets a target price for an asset, backend computes live VWAP from real trades, agents arbitrage the gap, UI shows a price ticker with sparklines.
+**Goal:** Phase 8 adds multi-asset ledgering (USD, EUR, STRAWBERRY, COMPUTEHOUR) with a new `commodity_swap` template and asset-aware visuals. Phase 9 layers on top: visitor sets a target price for an asset, backend computes live VWAP from real trades, agents arbitrage the gap, UI shows a price ticker with sparklines.
 
 **Architecture:** Plan 8 = static asset registry + tick context shows per-asset balances + agents' LLM prompts gain asset preferences + Glyph scene colors coin trails/deltas per asset. Plan 9 = `price_signals` table + `POST /market/:asset/signal` endpoint with rate limits + backend VWAP ticker + two new WS events (`price-signal-set`, `price-vwap-update`) + HUD "🎯 Set a price" modal + bottom-rail sparkline.
 
@@ -68,7 +68,7 @@
 
 ## Phase 8 — Multi-asset plumbing
 
-Ships as a standalone increment. After Task 12 the city transacts in USD, EUR, STRAWBERRY, COMPUTE_HOUR end-to-end; Phase 9 can follow later.
+Ships as a standalone increment. After Task 12 the city transacts in USD, EUR, STRAWBERRY, COMPUTEHOUR end-to-end; Phase 9 can follow later.
 
 ---
 
@@ -89,9 +89,9 @@ import { describe, it, expect } from "vitest";
 import { ASSET_REGISTRY, assetByCode, formatAmount, isCommodity } from "../src/assets.js";
 
 describe("ASSET_REGISTRY", () => {
-  it("seeds USD, EUR, STRAWBERRY, COMPUTE_HOUR", () => {
+  it("seeds USD, EUR, STRAWBERRY, COMPUTEHOUR", () => {
     expect(ASSET_REGISTRY.map((a) => a.code).sort()).toEqual([
-      "COMPUTE_HOUR/0", "EUR/2", "STRAWBERRY/0", "USD/2"
+      "COMPUTEHOUR/0", "EUR/2", "STRAWBERRY/0", "USD/2"
     ]);
   });
   it("USD has 2 decimals; STRAWBERRY has 0", () => {
@@ -101,7 +101,7 @@ describe("ASSET_REGISTRY", () => {
   it("scarce commodities have totalSupply; currencies don't", () => {
     expect(assetByCode("USD/2")?.totalSupply).toBeNull();
     expect(assetByCode("STRAWBERRY/0")?.totalSupply).toBe(200);
-    expect(assetByCode("COMPUTE_HOUR/0")?.totalSupply).toBe(50);
+    expect(assetByCode("COMPUTEHOUR/0")?.totalSupply).toBe(50);
   });
 });
 
@@ -115,8 +115,8 @@ describe("formatAmount", () => {
   it("STRAWBERRY → 3 🍓", () => {
     expect(formatAmount("STRAWBERRY/0", 3)).toBe("3 🍓");
   });
-  it("COMPUTE_HOUR → 2 💻", () => {
-    expect(formatAmount("COMPUTE_HOUR/0", 2)).toBe("2 💻");
+  it("COMPUTEHOUR → 2 💻", () => {
+    expect(formatAmount("COMPUTEHOUR/0", 2)).toBe("2 💻");
   });
   it("unknown asset falls back to raw", () => {
     expect(formatAmount("MYSTERY/9", 42)).toBe("42 MYSTERY/9");
@@ -159,7 +159,7 @@ export const ASSET_REGISTRY: Asset[] = [
   { code: "USD/2",          label: "US Dollar",     emoji: "🇺🇸", hex: "#BAEABC", decimals: 2, unitLabel: "$", prefix: true,  isCurrency: true,  totalSupply: null },
   { code: "EUR/2",          label: "Euro",          emoji: "🇪🇺", hex: "#8CB8D6", decimals: 2, unitLabel: "€", prefix: true,  isCurrency: true,  totalSupply: null },
   { code: "STRAWBERRY/0",   label: "Strawberry",    emoji: "🍓", hex: "#F5B8C8", decimals: 0, unitLabel: "🍓", prefix: false, isCurrency: false, totalSupply: 200 },
-  { code: "COMPUTE_HOUR/0", label: "Compute Hour",  emoji: "💻", hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false, isCurrency: false, totalSupply: 50 }
+  { code: "COMPUTEHOUR/0", label: "Compute Hour",  emoji: "💻", hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false, isCurrency: false, totalSupply: 50 }
 ];
 
 const BY_CODE = new Map(ASSET_REGISTRY.map((a) => [a.code, a]));
@@ -205,7 +205,7 @@ INSERT OR IGNORE INTO assets (code, label, emoji, hex, decimals, unit_label, is_
   ('USD/2',          'US Dollar',     '🇺🇸', '#BAEABC', 2, '$',  1, NULL),
   ('EUR/2',          'Euro',          '🇪🇺', '#8CB8D6', 2, '€',  1, NULL),
   ('STRAWBERRY/0',   'Strawberry',    '🍓', '#F5B8C8', 0, '🍓', 0, 200),
-  ('COMPUTE_HOUR/0', 'Compute Hour',  '💻', '#60D6CE', 0, '💻', 0, 50);
+  ('COMPUTEHOUR/0', 'Compute Hour',  '💻', '#60D6CE', 0, '💻', 0, 50);
 ```
 
 - [ ] **Step 1.5: Run — expect pass**
@@ -243,7 +243,7 @@ git add packages/orchestrator/migrations/005_assets.sql \
         packages/orchestrator/src/index.ts \
         packages/orchestrator/test/assets.test.ts \
         packages/orchestrator/test/db.test.ts
-git commit -m "feat(assets): asset registry — USD, EUR, STRAWBERRY, COMPUTE_HOUR"
+git commit -m "feat(assets): asset registry — USD, EUR, STRAWBERRY, COMPUTEHOUR"
 ```
 
 ---
@@ -304,7 +304,7 @@ set_tx_meta("asset", "STRAWBERRY/0")`,
   else       console.error(`seed strawberry ${id}: ${r.code} ${r.message}`);
 }
 
-// COMPUTE_HOUR — also scarce (50 total). Eve (researcher) gets most.
+// COMPUTEHOUR — also scarce (50 total). Eve (researcher) gets most.
 const computeAllocation: Record<string, number> = {
   "005": 30, "006": 5, "007": 5, "008": 5, "001": 5
 };
@@ -313,13 +313,13 @@ for (const id of agents) {
   if (amount === 0) continue;
   const ref = `genesis:compute:agents:${id}:available`;
   const r = await client.commit({
-    plain: `send [COMPUTE_HOUR/0 ${amount}] (
+    plain: `send [COMPUTEHOUR/0 ${amount}] (
   source      = @mint:genesis allowing unbounded overdraft
   destination = ${agentAvailable(id)}
 )
 set_tx_meta("type", "GENESIS_SEED")
 set_tx_meta("agent", "${id}")
-set_tx_meta("asset", "COMPUTE_HOUR/0")`,
+set_tx_meta("asset", "COMPUTEHOUR/0")`,
     vars: {},
     reference: ref
   });
@@ -355,7 +355,7 @@ print('metadata:', d.get('metadata'))
 
 ```bash
 git add scripts/seed-genesis.ts
-git commit -m "feat(assets): seed EUR, STRAWBERRY, COMPUTE_HOUR at genesis"
+git commit -m "feat(assets): seed EUR, STRAWBERRY, COMPUTEHOUR at genesis"
 ```
 
 ---
@@ -508,9 +508,9 @@ describe("AGENT_ASSET_PREF", () => {
   it("Alice prefers currencies only", () => {
     expect(AGENT_ASSET_PREF["001"]).toEqual(["USD/2", "EUR/2"]);
   });
-  it("Grace accepts STRAWBERRY + COMPUTE_HOUR (creative-tips flavor)", () => {
+  it("Grace accepts STRAWBERRY + COMPUTEHOUR (creative-tips flavor)", () => {
     expect(AGENT_ASSET_PREF["007"]).toContain("STRAWBERRY/0");
-    expect(AGENT_ASSET_PREF["007"]).toContain("COMPUTE_HOUR/0");
+    expect(AGENT_ASSET_PREF["007"]).toContain("COMPUTEHOUR/0");
   });
   it("Dave is USD/EUR only — no commodity credit", () => {
     expect(AGENT_ASSET_PREF["004"]).toEqual(["USD/2", "EUR/2"]);
@@ -540,12 +540,12 @@ export const AGENT_ASSET_PREF: Record<string, string[]> = {
   "002": ["USD/2", "EUR/2", "STRAWBERRY/0"],              // Bob — takes anything as gig fee
   "003": ["USD/2", "EUR/2"],                              // Carol — fees in currency
   "004": ["USD/2", "EUR/2"],                              // Dave — no commodity credit
-  "005": ["USD/2", "COMPUTE_HOUR/0"],                     // Eve — accepts compute as payment
+  "005": ["USD/2", "COMPUTEHOUR/0"],                     // Eve — accepts compute as payment
   "006": ["USD/2", "STRAWBERRY/0"],                       // Frank — strawberry tips flavor
-  "007": ["USD/2", "STRAWBERRY/0", "COMPUTE_HOUR/0"],     // Grace — creative tips
+  "007": ["USD/2", "STRAWBERRY/0", "COMPUTEHOUR/0"],     // Grace — creative tips
   "008": ["USD/2", "STRAWBERRY/0"],                       // Heidi — strawberry yield pool
   "009": ["USD/2", "EUR/2"],                              // Ivan — disputes in currency
-  "010": ["USD/2", "EUR/2", "STRAWBERRY/0", "COMPUTE_HOUR/0"] // Judy — probes anything
+  "010": ["USD/2", "EUR/2", "STRAWBERRY/0", "COMPUTEHOUR/0"] // Judy — probes anything
 };
 ```
 
@@ -713,7 +713,7 @@ describe("buildContext with multi-asset balances", () => {
       agent: { id: "008", name: "Heidi", role: "Pool", tagline: "t", color: "#7FD6A8", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
       peers: [],
       balancesByAsset: {
-        "@agents:008:available": { "USD/2": 10000, "STRAWBERRY/0": 60, "COMPUTE_HOUR/0": 5 }
+        "@agents:008:available": { "USD/2": 10000, "STRAWBERRY/0": 60, "COMPUTEHOUR/0": 5 }
       },
       preferredAssets: ["USD/2", "STRAWBERRY/0"],
       topRel: [], bottomRel: [], recent: []
@@ -723,7 +723,7 @@ describe("buildContext with multi-asset balances", () => {
     expect(user).toContain("$100.00");
     expect(user).toContain("STRAWBERRY/0");
     expect(user).toContain("60 🍓");
-    expect(user).toContain("COMPUTE_HOUR/0");
+    expect(user).toContain("COMPUTEHOUR/0");
     expect(user).toContain("5 💻");
     expect(user).toContain("Assets you care about: USD/2, STRAWBERRY/0");
   });
@@ -1034,7 +1034,7 @@ export const ASSET_PALETTE: Record<string, AssetRender> = {
   "USD/2":          { hex: "#BAEABC", decimals: 2, unitLabel: "$",  prefix: true  },
   "EUR/2":          { hex: "#8CB8D6", decimals: 2, unitLabel: "€",  prefix: true  },
   "STRAWBERRY/0":   { hex: "#F5B8C8", decimals: 0, unitLabel: "🍓", prefix: false },
-  "COMPUTE_HOUR/0": { hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false }
+  "COMPUTEHOUR/0": { hex: "#60D6CE", decimals: 0, unitLabel: "💻", prefix: false }
 };
 
 export function formatAmount(code: string | undefined, minorAmount: number): string {
@@ -1155,7 +1155,7 @@ for a in d.get('agents', [])[:3]:
 "
 ```
 
-Expected: each agent shows `USD/2` plus whatever other assets they were seeded with (EUR, STRAWBERRY, COMPUTE_HOUR).
+Expected: each agent shows `USD/2` plus whatever other assets they were seeded with (EUR, STRAWBERRY, COMPUTEHOUR).
 
 - [ ] **Step 11.3: Commit**
 
@@ -1212,7 +1212,7 @@ const ASSET_UNITS: Record<string, { decimals: number; unit: string; prefix: bool
   "USD/2":          { decimals: 2, unit: "$",  prefix: true  },
   "EUR/2":          { decimals: 2, unit: "€",  prefix: true  },
   "STRAWBERRY/0":   { decimals: 0, unit: "🍓", prefix: false },
-  "COMPUTE_HOUR/0": { decimals: 0, unit: "💻", prefix: false }
+  "COMPUTEHOUR/0": { decimals: 0, unit: "💻", prefix: false }
 };
 function formatAmountClient(code: string, amt: number): string {
   const m = ASSET_UNITS[code];
@@ -2073,7 +2073,7 @@ const ORCH_BASE = process.env.NEXT_PUBLIC_CITY_HTTP_URL ?? process.env.NEXT_PUBL
 
 const ASSETS = [
   { code: "STRAWBERRY/0", label: "🍓 Strawberry", decimals: 0, prefix: "" },
-  { code: "COMPUTE_HOUR/0", label: "💻 Compute hour", decimals: 0, prefix: "" },
+  { code: "COMPUTEHOUR/0", label: "💻 Compute hour", decimals: 0, prefix: "" },
   { code: "EUR/2", label: "€ Euro", decimals: 2, prefix: "$" },
   { code: "USD/2", label: "$ US Dollar", decimals: 2, prefix: "$" }
 ];
@@ -2156,7 +2156,7 @@ import { useCityStore } from "../../state/city-store";
 
 const ASSET_META: Record<string, { emoji: string; decimals: number; prefix: string }> = {
   "STRAWBERRY/0":   { emoji: "🍓", decimals: 0, prefix: "" },
-  "COMPUTE_HOUR/0": { emoji: "💻", decimals: 0, prefix: "" },
+  "COMPUTEHOUR/0": { emoji: "💻", decimals: 0, prefix: "" },
   "EUR/2":          { emoji: "€",  decimals: 2, prefix: "$" },
   "USD/2":          { emoji: "$",  decimals: 2, prefix: "$" }
 };
