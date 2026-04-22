@@ -26,18 +26,25 @@ export interface GlyphMoveEvent {
   id: string; fromZone: string; toZone: string; durationMs: number;
 }
 export interface GlyphTickEvent { tick: number; commits: number; rejects: number; }
+export interface GlyphDmEvent {
+  id: string;
+  from: string;     // 3-digit id
+  to: string;       // 3-digit id
+  preview: string;
+}
 
 type AnyGlyphEvent =
   | GlyphIntentEvent
   | GlyphCommitEvent
   | GlyphRejectEvent
   | GlyphMoveEvent
-  | GlyphTickEvent;
+  | GlyphTickEvent
+  | GlyphDmEvent;
 
 type Listener = (payload: AnyGlyphEvent) => void;
 
 export interface GlyphAdapter {
-  on(ev: "intent" | "commit" | "reject" | "agent-move" | "tick", fn: Listener): void;
+  on(ev: "intent" | "commit" | "reject" | "agent-move" | "tick" | "dm", fn: Listener): void;
   off(ev: string, fn: Listener): void;
   /** Scene calls this every 500ms; no-op in live mode. */
   tick(): void;
@@ -71,6 +78,7 @@ export function createGlyphAdapter(): GlyphAdapter {
   // don't re-fire old events.
   const emittedTickIds = new Set<string>();
   const emittedOfferIds = new Set<string>();
+  const emittedDmIds = new Set<string>();
 
   // Hydrate window: every subscriber fire in the first 800ms after mount is
   // treated as historical-snapshot noise (snapshot + /offers fetches resolve
@@ -85,6 +93,7 @@ export function createGlyphAdapter(): GlyphAdapter {
     if (isHydrating) {
       for (const r of s.recent) emittedTickIds.add(r.tickId);
       for (const id of Object.keys(s.offers)) emittedOfferIds.add(id);
+      for (const id of Object.keys(s.dms)) emittedDmIds.add(id);
       emit("tick", {
         tick: s.ticksToday,
         commits: s.committedToday,
@@ -137,6 +146,18 @@ export function createGlyphAdapter(): GlyphAdapter {
         parent: o.inReplyTo ?? undefined,
         judy: o.authorAgentId === "010"
       } as GlyphIntentEvent);
+    }
+
+    // New DMs → dm events (fresh posts only)
+    for (const d of Object.values(s.dms)) {
+      if (emittedDmIds.has(d.id)) continue;
+      emittedDmIds.add(d.id);
+      emit("dm", {
+        id: d.id,
+        from: d.fromAgentId,
+        to: d.toAgentId,
+        preview: d.preview
+      } as GlyphDmEvent);
     }
 
     // Per-change tick snapshot

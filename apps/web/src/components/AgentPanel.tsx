@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCityStore } from "../state/city-store";
 import { AGENT_TEMPLATES } from "../lib/agent-templates";
 
@@ -12,6 +12,18 @@ interface LedgerTx {
   postings: Array<{ source: string; destination: string; asset: string; amount: number }>;
   metadata: Record<string, string>;
 }
+interface DmApi {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  text: string;
+  inReplyTo: string | null;
+  inReplyKind: "dm" | "offer" | null;
+  createdAt: number;
+  readAt: number | null;
+  expiresAt: number;
+}
+
 interface AgentDetail {
   agent: { id: string; name: string; role: string; tagline: string; color: string; hustleMode: 0 | 1 };
   balance: number;
@@ -57,6 +69,43 @@ export default function AgentPanel() {
     const t = setInterval(fetchDetail, 10_000);
     return () => { cancelled = true; clearInterval(t); };
   }, [openId]);
+
+  const [dms, setDms] = useState<DmApi[]>([]);
+
+  // Fetch DMs involving this agent; refresh every 10s alongside detail
+  useEffect(() => {
+    if (!openId) { setDms([]); return; }
+    let cancelled = false;
+    const fetchDms = async () => {
+      try {
+        const r = await fetch(`${ORCH_BASE}/dms/agent/${openId}`, { cache: "no-store" });
+        const body = await r.json();
+        if (!cancelled) setDms(Array.isArray(body?.dms) ? body.dms : []);
+      } catch {
+        if (!cancelled) setDms([]);
+      }
+    };
+    fetchDms();
+    const t = setInterval(fetchDms, 10_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [openId]);
+
+  const conversationsByPeer = useMemo(() => {
+    const out = new Map<string, DmApi[]>();
+    for (const d of dms) {
+      const peer = d.fromAgentId === openId ? d.toAgentId : d.fromAgentId;
+      if (!out.has(peer)) out.set(peer, []);
+      out.get(peer)!.push(d);
+    }
+    // Sort oldest→newest within each peer thread for readability
+    for (const list of out.values()) list.sort((a, b) => a.createdAt - b.createdAt);
+    // Return peers sorted by most-recent message
+    return [...out.entries()].sort(([, a], [, b]) => {
+      const aMax = a[a.length - 1].createdAt;
+      const bMax = b[b.length - 1].createdAt;
+      return bMax - aMax;
+    });
+  }, [dms, openId]);
 
   if (!openId) return null;
   const fallback = agents[openId];
@@ -172,6 +221,39 @@ export default function AgentPanel() {
           </li>
         ))}
       </ul>
+
+      <h3 className="mt-5 mb-2 text-[10px] uppercase tracking-wider text-dim">
+        Conversations {dms.length > 0 ? `· ${conversationsByPeer.length} peer${conversationsByPeer.length === 1 ? "" : "s"}` : ""}
+      </h3>
+      {conversationsByPeer.length === 0 ? (
+        <div className="text-dim italic text-[11px]">no direct messages yet</div>
+      ) : (
+        <ul className="space-y-3">
+          {conversationsByPeer.map(([peerId, thread]) => (
+            <li key={peerId} className="border-l-2 border-mute pl-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-dim">with agent {peerId}</div>
+              <ul className="space-y-1 mt-1">
+                {thread.map((d) => {
+                  const isOut = d.fromAgentId === openId;
+                  return (
+                    <li key={d.id} className="text-[11px]">
+                      <span className={isOut ? "text-gold" : "text-paper"}>
+                        {isOut ? "→ you said:" : `← ${peerId} said:`}
+                      </span>{" "}
+                      <span className="text-paper">{d.text}</span>
+                      {d.inReplyTo && (
+                        <span className="text-dim text-[10px] ml-1">
+                          (reply to {d.inReplyTo})
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </aside>
   );
 }

@@ -24,7 +24,9 @@ import type {
   GlyphCommitEvent,
   GlyphRejectEvent,
   GlyphMoveEvent,
+  GlyphDmEvent,
 } from "./store-adapter";
+import { dmLine } from "./dm-effects";
 
 const COLORS = {
   sky:     "#011E22",
@@ -173,6 +175,7 @@ export class GlyphScene extends Phaser.Scene {
     this.adapter.on("commit",     (p) => this.onCommit(p as GlyphCommitEvent));
     this.adapter.on("reject",     (p) => this.onReject(p as GlyphRejectEvent));
     this.adapter.on("agent-move", (p) => this.onAgentMove(p as GlyphMoveEvent));
+    this.adapter.on("dm",         (p) => this.onDm(p as GlyphDmEvent));
   }
 
   update(_t: number, _dt: number) {
@@ -447,6 +450,13 @@ export class GlyphScene extends Phaser.Scene {
         });
       }
     }
+  }
+
+  private onDm({ from, to }: GlyphDmEvent) {
+    if (from === to) return;
+    const fromPos = this.agentPos(from);
+    const toPos = this.agentPos(to);
+    dmLine(this, fromPos.x, fromPos.y, toPos.x, toPos.y);
   }
 
   private onReject({ from, barrier }: GlyphRejectEvent) {

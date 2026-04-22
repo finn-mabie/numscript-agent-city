@@ -49,6 +49,16 @@ export interface OfferView {
   closedAt: number | null;
 }
 
+export interface DmView {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  preview: string;       // WS carries preview only — full text from /dms/agent/:id
+  inReplyTo: string | null;
+  inReplyKind: "dm" | "offer" | null;
+  createdAt: number;
+}
+
 interface CityState {
   agents: Record<string, AgentView>;
   recent: IntentLogView[];      // newest first, capped
@@ -64,6 +74,9 @@ interface CityState {
 
   // Offers
   offers: Record<string, OfferView>;
+
+  // Direct messages
+  dms: Record<string, DmView>;
 
   hydrate: (args: { agents: AgentView[]; recent: IntentLogView[] }) => void;
   applyEvent: (e: CityEvent) => void;
@@ -113,6 +126,7 @@ export const useCityStore = create<CityState>((set) => ({
   arenaRejected: 0,
   arenaActive: {},
   offers: {},
+  dms: {},
 
   hydrate({ agents, recent }) {
     const byId: Record<string, AgentView> = {};
@@ -234,6 +248,22 @@ export const useCityStore = create<CityState>((set) => ({
             }
           };
         }
+      }
+
+      if (e.kind === "dm-sent") {
+        const d = (e as any).data;
+        next.dms = {
+          ...s.dms,
+          [d.dmId]: {
+            id: d.dmId,
+            fromAgentId: d.fromAgentId,
+            toAgentId: d.toAgentId,
+            preview: d.preview,
+            inReplyTo: d.inReplyTo,
+            inReplyKind: d.inReplyKind,
+            createdAt: e.at
+          }
+        };
       }
 
       return next;
