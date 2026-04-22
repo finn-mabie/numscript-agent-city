@@ -27,6 +27,7 @@ interface DmApi {
 interface AgentDetail {
   agent: { id: string; name: string; role: string; tagline: string; color: string; hustleMode: 0 | 1 };
   balance: number;
+  balancesByAsset?: Record<string, number>;
   metadata: Record<string, string>;
   transactions: LedgerTx[];
   intentLog: Array<{
@@ -34,6 +35,20 @@ interface AgentDetail {
     params: unknown; outcome: string; errorPhase: string | null; errorCode: string | null;
     txId: string | null; createdAt: number;
   }>;
+}
+
+// Render-only palette; mirrors apps/web/src/glyph/asset-palette.ts.
+const ASSET_UNITS: Record<string, { decimals: number; unit: string; prefix: boolean }> = {
+  "USD/2":          { decimals: 2, unit: "$",  prefix: true  },
+  "EUR/2":          { decimals: 2, unit: "€",  prefix: true  },
+  "STRAWBERRY/0":   { decimals: 0, unit: "🍓", prefix: false },
+  "COMPUTEHOUR/0":  { decimals: 0, unit: "💻", prefix: false }
+};
+function formatAmountClient(code: string, amt: number): string {
+  const m = ASSET_UNITS[code];
+  if (!m) return `${amt} ${code}`;
+  const v = m.decimals === 0 ? String(amt) : (amt / 100).toFixed(m.decimals);
+  return m.prefix ? `${m.unit}${v}` : `${v} ${m.unit}`;
 }
 
 export default function AgentPanel() {
@@ -125,10 +140,24 @@ export default function AgentPanel() {
           <div className="text-[10px] uppercase tracking-wider text-dim">Agent {a.id}</div>
           <h2 className="text-lg font-semibold text-paper">{a.name}</h2>
           <div className="text-dim text-[11px]">
-            {a.role} · <span className="text-paper tabular-nums">${(balance / 100).toFixed(2)}</span>
+            {a.role}
             {hustleMode ? <span className="ml-1.5 text-hustle">· ♦ hustle</span> : null}
             {loading && <span className="ml-2 text-dim italic">refreshing…</span>}
           </div>
+          {detail?.balancesByAsset && Object.keys(detail.balancesByAsset).length > 0 ? (
+            <div className="mt-2 text-[11px] tabular-nums">
+              {Object.entries(detail.balancesByAsset).map(([code, amt]) => (
+                <div key={code} className="flex justify-between border-b border-mute/30 py-0.5">
+                  <span className="text-dim">{code}</span>
+                  <span className="text-paper">{formatAmountClient(code, amt)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-1 text-dim text-[11px]">
+              <span className="text-paper tabular-nums">${(balance / 100).toFixed(2)}</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1 items-end">
           <button
