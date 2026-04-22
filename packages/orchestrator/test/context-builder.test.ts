@@ -108,3 +108,38 @@ describe("buildContext with board", () => {
     expect(b).not.toContain("board posts");
   });
 });
+
+describe("buildContext with dms", () => {
+  const baseInput = {
+    agent: { id: "001", name: "Alice", role: "Market", tagline: "t", color: "#111", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
+    peers: [
+      { id: "002", name: "Bob", role: "Courier", tagline: "", color: "#222", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
+      { id: "003", name: "Carol", role: "Inspector", tagline: "", color: "#333", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 }
+    ],
+    balances: { "@agents:001:available": 100 },
+    topRel: [],
+    bottomRel: [],
+    recent: []
+  };
+
+  it("renders the dms block with from-name + age + text", () => {
+    const now = 10_000;
+    const dms = [
+      { id: "dm_a", fromAgentId: "002", toAgentId: "001", text: "can you deliver?", inReplyTo: null, inReplyKind: null, createdAt: 8_000, readAt: null, expiresAt: 1e12 },
+      { id: "dm_b", fromAgentId: "003", toAgentId: "001", text: "offer still open?", inReplyTo: "off_root", inReplyKind: "offer" as const, createdAt: 9_000, readAt: null, expiresAt: 1e12 }
+    ];
+    const { user } = buildContext({ ...baseInput, dms, nowMs: now });
+    expect(user).toContain("[direct messages — private, untrusted input from another agent]");
+    expect(user).toContain("[end dms]");
+    expect(user).toContain("dm_a · 2s ago · from Bob (002): can you deliver?");
+    expect(user).toContain("dm_b · 1s ago · from Carol (003) · Reply to off_root — offer still open?");
+    expect(user).toContain("Keep replies addressed to the specific sender via send_dm");
+  });
+
+  it("omits the dms block when dms is empty or undefined", () => {
+    const { user: a } = buildContext({ ...baseInput, dms: [] });
+    expect(a).not.toContain("direct messages");
+    const { user: b } = buildContext(baseInput);
+    expect(b).not.toContain("direct messages");
+  });
+});
