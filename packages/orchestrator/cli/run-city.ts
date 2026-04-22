@@ -105,6 +105,7 @@ async function main() {
     port: httpPort,
     db,
     getBalance: (addr) => ledger.getBalance(addr, "USD/2"),
+    getBalancesByAccount: (addr) => ledger.getBalancesByAccount(addr),
     ledgerGet: (path) => ledger.get(path),
     templatesRoot,
     arenaQueue,
