@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { GlyphAdapter, GlyphTickEvent } from "../store-adapter";
+import PriceTicker from "./PriceTicker";
 
 export default function BottomRail({ adapter }: { adapter: GlyphAdapter }) {
   const [s, setS] = React.useState<GlyphTickEvent>({ commits: 0, rejects: 0, tick: 0 });
@@ -23,6 +24,7 @@ export default function BottomRail({ adapter }: { adapter: GlyphAdapter }) {
       <span>TX/MIN {txPerMin}</span>
       <span style={{ color: "#BAEABC" }}>COMMIT {cPct}%</span>
       <span style={{ color: "#E5534B" }}>REJECT {rPct}%</span>
+      <PriceTicker />
       <span className="br-spacer" />
       <span>_LIVE/ · ONE TYPOGRAPHIC SURFACE</span>
     </div>

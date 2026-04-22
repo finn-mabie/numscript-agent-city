@@ -16,6 +16,7 @@ import AgentPanel from "../components/AgentPanel";
 import BuildingPanel from "../components/BuildingPanel";
 import TxPanel from "../components/TxPanel";
 import { ArenaBar } from "../components/ArenaBar";
+import PriceSignalModal from "../components/PriceSignalModal";
 
 const ORCH_BASE = process.env.NEXT_PUBLIC_CITY_HTTP_URL ?? process.env.NEXT_PUBLIC_ORCH_HTTP ?? "http://127.0.0.1:3071";
 const WS_URL = process.env.NEXT_PUBLIC_CITY_WS ?? "ws://127.0.0.1:3070";
@@ -109,6 +110,7 @@ export default function GlyphStage() {
         <BuildingPanel />
         <TxPanel />
         <ArenaBar />
+        <PriceSignalModal />
       </div>
     </div>
   );

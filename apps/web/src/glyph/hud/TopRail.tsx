@@ -20,6 +20,14 @@ export default function TopRail({ adapter }: { adapter: GlyphAdapter }) {
       <span className="tr-mint">● LIVE</span>
       <span className="tr-spacer" />
       <span className="tr-dim">VAULT $482,311.00</span>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent("nac:price-signal-open"))}
+        style={{ marginLeft: "0.75rem", pointerEvents: "auto" }}
+        className="text-[10px] uppercase tracking-wider border border-[#D4A24A] text-[#D4A24A] px-2 py-0.5 hover:bg-[#D4A24A] hover:text-black transition-colors"
+        title="Set a visitor price signal"
+      >
+        🎯 Set a price
+      </button>
     </div>
   );
 }

@@ -2,6 +2,15 @@
 import { create } from "zustand";
 import type { CityEvent } from "../lib/event-schema";
 
+export interface MarketSnapshot {
+  assetCode: string;
+  vwap: number | null;
+  vwapHistory: number[];   // last ~30 samples for sparkline
+  target: number | null;
+  targetExpiresAt: number | null;
+  updatedAt: number;
+}
+
 export interface AgentView {
   id: string;
   name: string;
@@ -79,6 +88,9 @@ interface CityState {
   // Direct messages
   dms: Record<string, DmView>;
 
+  // Market data
+  market: Record<string, MarketSnapshot>;
+
   hydrate: (args: { agents: AgentView[]; recent: IntentLogView[] }) => void;
   applyEvent: (e: CityEvent) => void;
   hydrateOffers: (offers: OfferView[]) => void;
@@ -128,6 +140,7 @@ export const useCityStore = create<CityState>((set) => ({
   arenaActive: {},
   offers: {},
   dms: {},
+  market: {},
 
   hydrate({ agents, recent }) {
     const byId: Record<string, AgentView> = {};
@@ -268,6 +281,26 @@ export const useCityStore = create<CityState>((set) => ({
             inReplyKind: d.inReplyKind,
             createdAt: e.at
           }
+        };
+      }
+
+      if (e.kind === "price-signal-set") {
+        const d = (e as any).data;
+        const existing = s.market[d.assetCode] ?? { assetCode: d.assetCode, vwap: null, vwapHistory: [], target: null, targetExpiresAt: null, updatedAt: 0 };
+        next.market = {
+          ...s.market,
+          [d.assetCode]: { ...existing, target: d.targetPrice, targetExpiresAt: d.expiresAt, updatedAt: e.at }
+        };
+      }
+      if (e.kind === "price-vwap-update") {
+        const d = (e as any).data;
+        const existing = s.market[d.assetCode] ?? { assetCode: d.assetCode, vwap: null, vwapHistory: [], target: null, targetExpiresAt: null, updatedAt: 0 };
+        const history = d.vwap !== null
+          ? [...existing.vwapHistory, d.vwap].slice(-30)
+          : existing.vwapHistory;
+        next.market = {
+          ...s.market,
+          [d.assetCode]: { ...existing, vwap: d.vwap, vwapHistory: history, updatedAt: d.asOf }
         };
       }
 
