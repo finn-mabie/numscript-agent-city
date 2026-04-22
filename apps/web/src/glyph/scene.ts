@@ -264,48 +264,33 @@ export class GlyphScene extends Phaser.Scene {
     });
   }
 
-  private onIntent({ from, to, kind, amount, summary, judy }: GlyphIntentEvent) {
-    // Speech-bubble at sender — gold for root offer, silver for reply.
-    // Shows WHO is talking + the first part of what they're saying, not "$0".
+  private onIntent({ from, to, kind, judy }: GlyphIntentEvent) {
+    // Tiny tag above the author — "offer" or "reply" — that's it.
+    // The full offer text lives in the right-side Intent Board rail where
+    // it belongs; the canvas just flashes a lightweight marker so you know
+    // WHO posted WITHOUT a two-line speech bubble eating the screen.
     const fromPos = this.agentPos(from);
     const color = judy ? COLORS.red : (kind === "offer" ? COLORS.gold : COLORS.silver);
-    const sender = glyphAgentById(from);
-    const name = sender?.name ?? from;
+    const label = kind === "offer" ? "◆ offer" : "↘ reply";
 
-    // Clip body text — bubble gets wider than the older $-bubble
-    const shown = summary && summary.length > 48 ? summary.slice(0, 45).trimEnd() + "…" : (summary ?? "");
-    const headText = kind === "offer" ? `◆ ${sender?.glyph ?? from} ${name.toUpperCase()} OFFERS` : `↘ ${sender?.glyph ?? from} ${name.toUpperCase()} REPLIES`;
-    const bubbleW = Math.max(180, Math.min(280, shown.length * 5.2 + 24));
-    const bubbleH = shown ? 38 : 26;
+    const tag = this.add.text(fromPos.x, fromPos.y - 18, label, {
+      fontFamily: FONT, fontSize: "8px", color,
+      backgroundColor: "#011e22",
+      padding: { left: 3, right: 3, top: 1, bottom: 1 },
+      letterSpacing: 1.1,
+    }).setResolution(2).setOrigin(0.5, 1);
+    tag.setAlpha(0);
 
-    const bubble = this.add.container(fromPos.x + 20, fromPos.y - bubbleH - 6);
-    const bg = this.add.rectangle(0, 0, bubbleW, bubbleH, 0x011e22, 1)
-      .setStrokeStyle(1, Phaser.Display.Color.HexStringToColor(color).color);
-    bg.setOrigin(0, 0);
-    const head = this.add.text(6, 4, headText, {
-      fontFamily: FONT, fontSize: "8px", color, letterSpacing: 1.2,
-    }).setResolution(2);
-    const body = shown
-      ? this.add.text(6, 16, shown, {
-          fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
-          wordWrap: { width: bubbleW - 12 },
-        }).setResolution(2)
-      : null;
-    // If there's a concrete amount (>0), show a small "— $N" suffix in the head
-    if (amount > 0) {
-      const amt = this.add.text(bubbleW - 6, 4, `$${amount}`, {
-        fontFamily: FONT, fontSize: "8px", color: COLORS.gold, letterSpacing: 1.2,
-      }).setResolution(2).setOrigin(1, 0);
-      bubble.add(amt);
-    }
-    bubble.add([bg, head, ...(body ? [body] : [])]);
-    bubble.setAlpha(0);
-    this.tweens.add({ targets: bubble, alpha: 1, duration: 120 });
-    this.receipts.push({ container: bubble, bornAt: this.time.now, duration: 2400 });
+    this.tweens.add({ targets: tag, alpha: 1, duration: 120 });
+    this.tweens.add({
+      targets: tag, y: tag.y - 8, alpha: 0,
+      delay: 1400, duration: 600, ease: "cubic.in",
+      onComplete: () => tag.destroy(),
+    });
+    this.receipts.push({ container: tag as unknown as Phaser.GameObjects.Container, bornAt: this.time.now, duration: 2000 });
 
-    // Coin trail only for REPLY intents that actually cross between agents
-    // (root offers are broadcasts — from==to for us, so we skip to avoid a
-    // self-loop particle trail that makes no sense).
+    // Replies that cross between agents still get a coin trail so the
+    // targeted nature of the reply is visible. Root offers skip it.
     if (kind === "reply" && to !== from) {
       const toSprite = this.agentSprites.get(to);
       if (toSprite) this.fireCoinTrail(fromPos, this.agentPos(to), judy ? COLORS.red : COLORS.gold);
