@@ -281,3 +281,107 @@ export function offerRepo(db: Database.Database) {
     }
   };
 }
+
+// ── Direct Messages ──────────────────────────────────────────────────────
+export interface DmRecord {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  text: string;
+  inReplyTo: string | null;
+  inReplyKind: "dm" | "offer" | null;
+  createdAt: number;
+  readAt: number | null;
+  expiresAt: number;
+}
+
+export function dmRepo(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT INTO dms
+      (id, from_agent_id, to_agent_id, text, in_reply_to, in_reply_kind, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const get = db.prepare(`SELECT * FROM dms WHERE id = ?`);
+  const unreadStmt = db.prepare(`
+    SELECT * FROM dms
+    WHERE to_agent_id = ? AND read_at IS NULL AND expires_at > ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  const markReadStmt = db.prepare(`UPDATE dms SET read_at = ? WHERE id = ? AND read_at IS NULL`);
+  const conversationStmt = db.prepare(`
+    SELECT * FROM dms
+    WHERE (from_agent_id = ? AND to_agent_id = ?)
+       OR (from_agent_id = ? AND to_agent_id = ?)
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  const recentBySender = db.prepare(`
+    SELECT COUNT(*) AS c FROM dms
+    WHERE from_agent_id = ? AND created_at >= ?
+  `);
+  const recentBySenderToRecipient = db.prepare(`
+    SELECT COUNT(*) AS c FROM dms
+    WHERE from_agent_id = ? AND to_agent_id = ? AND created_at >= ?
+  `);
+  const countExpired = db.prepare(`
+    SELECT COUNT(*) AS c FROM dms
+    WHERE expires_at < ? AND read_at IS NULL
+  `);
+
+  const row2rec = (r: any): DmRecord => ({
+    id: r.id,
+    fromAgentId: r.from_agent_id,
+    toAgentId: r.to_agent_id,
+    text: r.text,
+    inReplyTo: r.in_reply_to,
+    inReplyKind: r.in_reply_kind,
+    createdAt: r.created_at,
+    readAt: r.read_at,
+    expiresAt: r.expires_at,
+  });
+
+  return {
+    insert(args: {
+      id: string;
+      fromAgentId: string;
+      toAgentId: string;
+      text: string;
+      inReplyTo: string | null;
+      inReplyKind: "dm" | "offer" | null;
+      createdAt: number;
+      expiresAt: number;
+    }): void {
+      insert.run(
+        args.id, args.fromAgentId, args.toAgentId, args.text,
+        args.inReplyTo, args.inReplyKind, args.createdAt, args.expiresAt
+      );
+    },
+    get(id: string): DmRecord | null {
+      const r = get.get(id);
+      return r ? row2rec(r) : null;
+    },
+    unreadFor(agentId: string, limit: number): DmRecord[] {
+      const now = Date.now();
+      return (unreadStmt.all(agentId, now, limit) as any[]).map(row2rec);
+    },
+    markRead(dmIds: string[], now: number): void {
+      for (const id of dmIds) markReadStmt.run(now, id);
+    },
+    conversation(agentA: string, agentB: string, limit: number): DmRecord[] {
+      return (conversationStmt.all(agentA, agentB, agentB, agentA, limit) as any[]).map(row2rec);
+    },
+    recentSentCount(fromAgentId: string, since: number, toAgentId?: string): number {
+      if (toAgentId) {
+        const r = recentBySenderToRecipient.get(fromAgentId, toAgentId, since) as { c: number };
+        return r?.c ?? 0;
+      }
+      const r = recentBySender.get(fromAgentId, since) as { c: number };
+      return r?.c ?? 0;
+    },
+    expireOlderThan(now: number): number {
+      const r = countExpired.get(now) as { c: number };
+      return r?.c ?? 0;
+    }
+  };
+}
