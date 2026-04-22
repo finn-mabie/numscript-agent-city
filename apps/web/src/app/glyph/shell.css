@@ -1,0 +1,88 @@
+/* Glyph City — live grid shell. Scoped by .shell — does not leak to `/`. */
+
+.shell {
+  display: grid;
+  grid-template-rows: 28px 1fr 72px;
+  grid-template-columns: 1fr 320px;
+  grid-template-areas:
+    "top  top"
+    "cvs  ib"
+    "tk   tk";
+  width: 100vw;
+  height: 100vh;
+  gap: 0;
+  background: var(--sky-deep);
+  background-image: radial-gradient(circle, rgba(213, 225, 225, 0.05) 1px, transparent 1.25px);
+  background-size: 12px 12px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+
+.tr {
+  grid-area: top;
+  display: flex; align-items: center; gap: 26px;
+  padding: 0 18px;
+  font-size: 10px; letter-spacing: 1.6px; color: var(--ink-dim);
+  border-bottom: 1px solid var(--sky-rule);
+  text-transform: uppercase;
+}
+.tr-brand { color: var(--ink); }
+.tr-red   { color: var(--scream); }
+.tr-mint  { color: var(--mint); }
+.tr-dim   { color: var(--ink-dim); }
+.tr-spacer { flex: 1; }
+
+.canvas-wrap {
+  grid-area: cvs;
+  position: relative;
+  border-right: 1px solid var(--sky-rule);
+  overflow: hidden;
+  min-height: 0;
+}
+.canvas-wrap > canvas { display: block; }
+
+.ib {
+  grid-area: ib;
+  padding: 14px 16px 16px;
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: 10px;
+  font-size: 11px;
+}
+.ib-head, .ib-log-head {
+  font-size: 10px; letter-spacing: 1.6px; color: var(--ink-dim); text-transform: uppercase;
+  padding-bottom: 6px; border-bottom: 1px solid var(--sky-rule);
+}
+.ib-threads, .ib-log {
+  display: flex; flex-direction: column; gap: 8px; overflow: hidden;
+}
+.ib-thread { display: flex; flex-direction: column; gap: 4px; }
+.ib-root { display: grid; grid-template-columns: auto auto auto; gap: 0 10px; align-items: baseline; }
+.ib-tag { font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase; }
+.ib-who { font-size: 12px; }
+.ib-amt { color: var(--ink); margin-left: auto; }
+.ib-sum { grid-column: 1 / -1; color: var(--ink-soft); font-size: 11px; }
+.ib-state { grid-column: 1 / -1; font-size: 9px; letter-spacing: 1.2px; }
+.ib-reply { padding-left: 18px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ib-connector { width: 8px; height: 1px; background: var(--sky-rule); display: inline-block; }
+.ib-log-row { display: flex; gap: 10px; font-size: 10px; color: var(--ink-soft); }
+
+.tk {
+  grid-area: tk;
+  border-top: 1px solid var(--sky-rule);
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 18px;
+  overflow: hidden;
+  font-size: 11px;
+}
+.tk-lbl { color: var(--ink-dim); letter-spacing: 1.6px; font-size: 10px; text-transform: uppercase; }
+.tk-rows { display: flex; gap: 22px; overflow: hidden; white-space: nowrap; }
+.tk-row { display: flex; gap: 6px; align-items: baseline; }
+.tk-tx { color: var(--ink-dim); font-size: 10px; }
+.tk-who { color: var(--ink-soft); }
+.tk-amt { font-size: 11px; }
+
+.br {
+  color: var(--ink-dim); letter-spacing: 1.2px; font-size: 9px; text-transform: uppercase;
+  margin-left: auto; display: flex; gap: 18px; align-items: center;
+}
+.br-spacer { flex: 1; }
