@@ -66,5 +66,6 @@ export interface TickOutcome {
   result:
     | InvokeResult
     | { ok: true; idle: true }
-    | { ok: true; postOffer: true; offerId: string };
+    | { ok: true; postOffer: true; offerId: string }
+    | { ok: true; sentDm: true; dmId: string };
 }

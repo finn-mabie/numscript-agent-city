@@ -13,8 +13,11 @@ import type { ArenaQueue, QueuedAttack } from "./arena.js";
 import type { arenaRepo } from "./repositories.js";
 import { validateOfferText, newOfferId, OFFER_ID_RE } from "./offers.js";
 import { AGENT_TEMPLATE_MAP } from "./agent-templates-map.js";
+import type { dmRepo as dmRepoFactory } from "./repositories.js";
+import { validateDmText, newDmId, DM_ID_RE } from "./dms.js";
 type ArenaRepo = ReturnType<typeof arenaRepo>;
 type OfferRepoT = ReturnType<typeof offerRepoFactory>;
+type DmRepoT = ReturnType<typeof dmRepoFactory>;
 
 export interface TickDeps {
   db: Database.Database;
@@ -32,6 +35,10 @@ export interface TickDeps {
   offerRepo?: OfferRepoT;
   /** Called on every valid post_offer. run-city advances up to 3 peers from templateOverlapPeers. */
   advancePeersOnOffer?: (args: { authorAgentId: string; offerId: string; templateOverlapPeers: string[] }) => void;
+  /** Direct-messages repo. When set, DMs flow into context and send_dm action persists here. */
+  dmRepo?: DmRepoT;
+  /** Called on every committed send_dm. run-city advances the recipient's nextTickAt. */
+  advancePeerForDm?: (args: { senderAgentId: string; recipientAgentId: string; dmId: string }) => void;
 }
 
 // Tick intervals are env-configurable so demo/visual-testing can shorten
@@ -47,6 +54,10 @@ const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (SLOW ? 7 * 60 * 
 const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (SLOW ? 13 * 60 * 1000 : 18_000));
 const LOW_BALANCE_TRACKER = new Map<string, number>();
 const OFFER_TTL_MS = 5 * 60_000;
+const DM_TTL_MS = 10 * 60_000;        // 10 min (spec §5.3 / §11)
+const DM_RL_WINDOW_MS = 60_000;       // 60s rate-limit window
+const DM_RL_PER_RECIPIENT = 3;        // max 3 DMs to same recipient per 60s
+const DM_RL_GLOBAL = 10;              // max 10 DMs total per 60s
 
 function nextTickAt(now: number): number {
   const span = MAX_TICK_INTERVAL_MS - MIN_TICK_INTERVAL_MS;
@@ -151,10 +162,12 @@ export async function tickAgent(
     const bottomRel = rels.bottom(agent.id, 3);
     const recent = log.recent(agent.id, 5);
     const board = deps.offerRepo?.openOffers(8, agent.id) ?? [];
+    const dmsList = deps.dmRepo?.unreadFor(agent.id, 3) ?? [];
     const { system, user } = buildContext({
       agent, peers: allAgents, balances, topRel, bottomRel, recent,
       arenaInjection: queued?.prompt,
-      board
+      board,
+      dms: dmsList
     });
 
     deps.emit({ kind: "tick-start", agentId: agent.id, tickId, at: Date.now(),
@@ -163,6 +176,10 @@ export async function tickAgent(
     // LLM call
     const tools = toolsForTemplates(deps.templates);
     const action = await deps.llm.pickAction({ system, user }, tools);
+    // Mark unread DMs we showed the LLM as read so they don't re-appear
+    if (deps.dmRepo && dmsList.length > 0) {
+      deps.dmRepo.markRead(dmsList.map((d) => d.id), Date.now());
+    }
 
     deps.emit({
       kind: "intent",
@@ -246,6 +263,103 @@ export async function tickAgent(
         phase: null, code: "POST_OFFER"
       });
       return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, postOffer: true, offerId } };
+    }
+
+    // ── send_dm branch (Direct Messages) ────────────────────────────────
+    if (action.tool === "send_dm") {
+      const rawTo = String((action.input as any)?.to ?? "");
+      const rawText = String((action.input as any)?.text ?? "");
+      const rawReply = (action.input as any)?.in_reply_to;
+
+      // Bail-to-idle helper — matches the pattern used in post_offer invalid branch
+      const idleWithCode = (code: string) => {
+        log.insert({
+          agentId: agent.id, tickId, reasoning: action.reasoning,
+          templateId: "send_dm", params: action.input as Record<string, ParamValue>,
+          outcome: "idle",
+          errorPhase: "validate", errorCode: code,
+          txId: null, createdAt: Date.now()
+        });
+        ag.updateNextTick(agent.id, nextTickAt(Date.now()));
+        deps.emit({ kind: "idle", agentId: agent.id, tickId, at: Date.now() });
+        recordAndEmitArenaResolved({
+          queued, tickId, agentId: agent.id,
+          arenaRepo: deps.arenaRepo, emit: deps.emit,
+          outcome: "idle", status: "rejected",
+          phase: null, code
+        });
+        return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, idle: true } as const };
+      };
+
+      // Validations (each returns with a distinct error code)
+      if (!deps.dmRepo)                             return idleWithCode("DmsNotConfigured");
+      if (!/^[0-9]{3}$/.test(rawTo))                return idleWithCode("InvalidRecipient");
+      if (rawTo === agent.id)                       return idleWithCode("SelfDm");
+      if (!allAgents.some((a) => a.id === rawTo))   return idleWithCode("UnknownRecipient");
+      const text = validateDmText(rawText);
+      if (!text)                                    return idleWithCode("InvalidDmText");
+
+      // Rate limits
+      const rlNow = Date.now();
+      const since = rlNow - DM_RL_WINDOW_MS;
+      const sentGlobal = deps.dmRepo.recentSentCount(agent.id, since);
+      if (sentGlobal >= DM_RL_GLOBAL)               return idleWithCode("DmRateLimitGlobal");
+      const sentPerRecipient = deps.dmRepo.recentSentCount(agent.id, since, rawTo);
+      if (sentPerRecipient >= DM_RL_PER_RECIPIENT)  return idleWithCode("DmRateLimitRecipient");
+
+      // Validate in_reply_to: must shape-match either dm_xxx or off_xxx AND exist open
+      let inReplyTo: string | null = null;
+      let inReplyKind: "dm" | "offer" | null = null;
+      if (typeof rawReply === "string") {
+        if (DM_ID_RE.test(rawReply)) {
+          const parent = deps.dmRepo.get(rawReply);
+          if (parent) { inReplyTo = rawReply; inReplyKind = "dm"; }
+        } else if (/^off_[a-z0-9]+_[a-f0-9]{4}$/.test(rawReply) && deps.offerRepo) {
+          const parentOffer = deps.offerRepo.get(rawReply);
+          if (parentOffer && parentOffer.status === "open") {
+            inReplyTo = rawReply; inReplyKind = "offer";
+          }
+        }
+      }
+
+      const dmId = newDmId();
+      const createdAt = Date.now();
+      const expiresAt = createdAt + DM_TTL_MS;
+      deps.dmRepo.insert({
+        id: dmId, fromAgentId: agent.id, toAgentId: rawTo,
+        text, inReplyTo, inReplyKind, createdAt, expiresAt
+      });
+
+      const preview = text.replace(/\s+/g, " ").slice(0, 60);
+
+      log.insert({
+        agentId: agent.id, tickId, reasoning: action.reasoning,
+        templateId: "send_dm",
+        params: { to: rawTo, text, in_reply_to: inReplyTo, dm_id: dmId } as Record<string, ParamValue>,
+        outcome: "committed",
+        errorPhase: null, errorCode: null, txId: null, createdAt
+      });
+
+      deps.emit({
+        kind: "dm-sent", agentId: agent.id, tickId, at: createdAt,
+        data: { dmId, fromAgentId: agent.id, toAgentId: rawTo, preview, inReplyTo, inReplyKind }
+      });
+
+      // Ask run-city to wake the recipient so the DM is seen promptly
+      deps.advancePeerForDm?.({ senderAgentId: agent.id, recipientAgentId: rawTo, dmId });
+
+      // If this was a visitor-queued arena prompt that resolved into a DM,
+      // treat it like a post_offer resolution — the cage made the visitor's
+      // prompt produce only a DM (no financial damage).
+      recordAndEmitArenaResolved({
+        queued, tickId, agentId: agent.id,
+        arenaRepo: deps.arenaRepo, emit: deps.emit,
+        outcome: "idle", status: "rejected",
+        phase: null, code: "SEND_DM"
+      });
+
+      ag.updateNextTick(agent.id, nextTickAt(Date.now()));
+      return { tickId, agentId: agent.id, durationMs: Date.now() - started, result: { ok: true, sentDm: true, dmId } };
     }
 
     // Idle short-circuit

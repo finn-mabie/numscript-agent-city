@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { openDb } from "../src/db.js";
-import { agentRepo, offerRepo } from "../src/repositories.js";
+import { agentRepo, offerRepo, dmRepo } from "../src/repositories.js";
 import { tickAgent } from "../src/tick.js";
 import { ROSTER } from "../src/roster.js";
 import { LedgerClient, loadTemplates } from "@nac/template-engine";
@@ -284,5 +284,130 @@ describe("tickAgent with post_offer", () => {
     const row = offers.get("off_test123_abcd");
     expect(row?.status).toBe("closed");
     expect(row?.closedByAgent).toBe("001");
+  });
+});
+
+describe("tickAgent with send_dm", () => {
+  it("sends a DM, emits dm-sent, marks unread DMs read, wakes recipient", async () => {
+    const path = join(tmpdir(), `tick-dm-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+    const dms = dmRepo(db);
+
+    // Seed one unread DM addressed to agent 001 so we can verify markRead
+    dms.insert({
+      id: "dm_prior_abcd", fromAgentId: "002", toAgentId: "001",
+      text: "hey alice want to partner?", inReplyTo: null, inReplyKind: null,
+      createdAt: Date.now() - 5000, expiresAt: Date.now() + 600_000
+    });
+
+    let advancedPeer: string | null = null;
+    const llm: LLMClient = {
+      async pickAction() {
+        return {
+          tool: "send_dm", reasoning: "DMing bob with terms",
+          input: { to: "002", text: "sure — what's your split?" }
+        };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    const outcome = await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e),
+      dmRepo: dms,
+      advancePeerForDm: ({ recipientAgentId }) => { advancedPeer = recipientAgentId; }
+    });
+
+    // Outcome shape
+    expect(outcome.result).toMatchObject({ ok: true, sentDm: true });
+    const newDmId = (outcome.result as any).dmId;
+    expect(newDmId).toMatch(/^dm_/);
+
+    // Row persisted
+    const row = dms.get(newDmId);
+    expect(row?.fromAgentId).toBe("001");
+    expect(row?.toAgentId).toBe("002");
+    expect(row?.text).toBe("sure — what's your split?");
+
+    // Event emitted with preview only (not full text — but they're short)
+    const sent = events.find((e) => e.kind === "dm-sent");
+    expect(sent).toBeTruthy();
+    expect((sent as any).data.dmId).toBe(newDmId);
+    expect((sent as any).data.fromAgentId).toBe("001");
+    expect((sent as any).data.toAgentId).toBe("002");
+    expect((sent as any).data.preview).toBeTruthy();
+
+    // Recipient advance hook fired
+    expect(advancedPeer).toBe("002");
+
+    // Pre-existing unread DM was marked read
+    expect(dms.get("dm_prior_abcd")?.readAt).toBeTruthy();
+  });
+
+  it("rejects self-DM with invalid code, treats as idle", async () => {
+    const path = join(tmpdir(), `tick-dm-self-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+    const dms = dmRepo(db);
+
+    const llm: LLMClient = {
+      async pickAction() {
+        return { tool: "send_dm", reasoning: "confused",
+                 input: { to: "001", text: "talking to myself" } };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    const outcome = await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e), dmRepo: dms
+    });
+
+    expect(outcome.result).toMatchObject({ ok: true, idle: true });
+    const idle = events.find((e) => e.kind === "idle");
+    expect(idle).toBeTruthy();
+    // No dm-sent event
+    expect(events.find((e) => e.kind === "dm-sent")).toBeUndefined();
+  });
+
+  it("enforces per-recipient rate limit (3 DMs from same sender to same recipient in 60s)", async () => {
+    const path = join(tmpdir(), `tick-dm-rl-${Date.now()}-${Math.random()}.sqlite`);
+    const db = openDb(path); rosterSeed(db);
+    const events: CityEvent[] = [];
+    const templates = await loadTemplates(templatesRoot);
+    const client = new LedgerClient(url, ledger);
+    const dms = dmRepo(db);
+
+    // Pre-seed 3 recent DMs from 001 to 002 (saturates the per-recipient bucket)
+    const now = Date.now();
+    for (let i = 0; i < 3; i++) {
+      dms.insert({
+        id: `dm_pre${i}_0000`, fromAgentId: "001", toAgentId: "002",
+        text: `prior ${i}`, inReplyTo: null, inReplyKind: null,
+        createdAt: now - 5_000 + i, expiresAt: now + 600_000
+      });
+    }
+
+    const llm: LLMClient = {
+      async pickAction() {
+        return { tool: "send_dm", reasoning: "one more",
+                 input: { to: "002", text: "still there?" } };
+      }
+    };
+
+    const agent = agentRepo(db).get("001")!;
+    const outcome = await tickAgent(agent, {
+      db, ledger: client, llm, templates, templatesRoot,
+      emit: (e) => events.push(e), dmRepo: dms
+    });
+
+    // Should short-circuit to idle with a rate-limit code in the intent log
+    expect(outcome.result).toMatchObject({ ok: true, idle: true });
+    expect(events.find((e) => e.kind === "dm-sent")).toBeUndefined();
   });
 });
