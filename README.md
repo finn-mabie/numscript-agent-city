@@ -109,21 +109,24 @@ Judy's job is to continuously attempt edge cases. Every rejection feeds the same
 - `pnpm --filter @nac/web build` succeeds with no TypeScript errors
 - `pnpm --filter @nac/web lint` clean (tsc --noEmit)
 - `pnpm --filter @nac/orchestrator test` — 41 tests pass, /snapshot included
-- Manual visual smoke: open http://localhost:3000 while `DEMO_MODE=1 pnpm city:start` runs — 10 pixel sprites visible, at least one coin-flow or barrier event within 60s, hover + click panels work, browser console clean
+- Manual visual smoke: open http://localhost:3000 while `pnpm city:start` runs — the default route is **Glyph City** (dark-emerald typographic data-room, built with Claude Design). Legacy pixel-sprite village is preserved at http://localhost:3000/legacy. Click any agent glyph or zone to open the detail panel; press `/` to open the arena; press `b` to toggle the board.
 
 ## Plan 3 — Visual City
 
-The pixel village.
+The village — default route is Glyph City, pixel village at /legacy.
 
-    export ANTHROPIC_API_KEY=sk-ant-...
-    pnpm ledger:up
+    export ANTHROPIC_API_KEY=sk-ant-...       # or put in .env (auto-loaded)
+    pnpm ledger:up                            # or use Formance Cloud via LEDGER_URL / OAUTH_*
     pnpm seed-genesis
     pnpm --filter @nac/template-engine build
     pnpm --filter @nac/orchestrator build
-    DEMO_MODE=1 pnpm city:start     # terminal A — 20-40s ticks instead of 7-13min
-    pnpm web:dev                    # terminal B — http://localhost:3000
+    pnpm city:start                           # terminal A — 20-40s demo ticks are default; SLOW_TICKS=1 for 7-13min realistic cadence
+    pnpm web:dev                              # terminal B — http://localhost:3000
 
-Open http://localhost:3000. Ten colored agent sprites walk a 20×12 tile-mapped town. When an agent commits, **gold coin-flow particles** trail between it and its counterparty, plus a `✓ template_id` popup you can click to inspect. When a rejection fires, a **color-coded barrier** flashes — vermillion for authorization (the cross-agent-theft guard), blue for schema validate, deep red for ledger commit, gray for other. The HUD top-bar ticks live: in-circulation $, ticks today, rejected today (pulses vermillion on increment), uptime.
+Open http://localhost:3000.
+Default view is **Glyph City** — 10 circled-letter glyphs (Ⓐ…Ⓙ) wobbling inside 6 named zones (MKT, BNK, POS, INS, POL, ESC) plus a `?` zone for Judy. Commits print mint `COMMIT · tx N` receipts; rejects slam framed _CAGE / BARRIER ENGAGED_ dialog stamps keyed to the guard that caught them (teal hexagon for schema, red ⊘ for overdraft, 404 for unknown template, lilac ⟳ for idempotency replay). An intent-board rail on the right shows offer threads + a flat log; a ticker at the bottom streams the live commit/reject feed. Click an agent → full AgentPanel (ledger history + intent log). Click a zone → BuildingPanel for the owner.
+
+Legacy pixel view at http://localhost:3000/legacy: ten colored agent sprites walk a 20×12 tile-mapped town. When an agent commits, **gold coin-flow particles** trail between it and its counterparty, plus a `✓ template_id` popup you can click to inspect. When a rejection fires, a **color-coded barrier** flashes — vermillion for authorization (the cross-agent-theft guard), blue for schema validate, deep red for ledger commit, gray for other. The HUD top-bar ticks live: in-circulation $, ticks today, rejected today (pulses vermillion on increment), uptime.
 
 Hover an agent → a small card with name / role / tagline / balance. Click an agent → right-side panel with the full intent log. Click a commit popup → left-side panel with the committed tx's params + outcome.
 
