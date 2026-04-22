@@ -12,7 +12,7 @@ import type { LLMClient } from "./llm.js";
 import type { ArenaQueue, QueuedAttack } from "./arena.js";
 import type { arenaRepo } from "./repositories.js";
 import { validateOfferText, newOfferId, OFFER_ID_RE } from "./offers.js";
-import { AGENT_TEMPLATE_MAP } from "./agent-templates-map.js";
+import { AGENT_TEMPLATE_MAP, AGENT_ASSET_PREF } from "./agent-templates-map.js";
 import type { dmRepo as dmRepoFactory } from "./repositories.js";
 import { validateDmText, newDmId, DM_ID_RE } from "./dms.js";
 type ArenaRepo = ReturnType<typeof arenaRepo>;
@@ -131,15 +131,16 @@ export async function tickAgent(
     const rels = relationshipsRepo(deps.db);
     const log = intentLogRepo(deps.db);
 
-    // Ledger snapshot
+    // Ledger snapshot — fetch all asset balances per agent in one call
     const allAgents = ag.list();
-    const balances: Record<string, number> = {};
+    const balancesByAsset: Record<string, Record<string, number>> = {};
     for (const peer of allAgents) {
       const addr = `@agents:${peer.id}:available`;
-      const bal = await deps.ledger.getBalance(addr, "USD/2");
-      balances[addr] = bal ?? 0;
+      const byAsset = await deps.ledger.getBalancesByAccount(addr);
+      balancesByAsset[addr] = Object.fromEntries(byAsset.entries());
     }
-    const selfBalance = balances[`@agents:${agent.id}:available`] ?? 0;
+    const selfBalancesMap = balancesByAsset[`@agents:${agent.id}:available`] ?? {};
+    const selfBalance = selfBalancesMap["USD/2"] ?? 0;  // for hustle-mode + overdraft-warning logic
 
     // Hustle mode transition
     const low = selfBalance <= HUSTLE_THRESHOLD_CENTS
@@ -164,10 +165,11 @@ export async function tickAgent(
     const board = deps.offerRepo?.openOffers(8, agent.id) ?? [];
     const dmsList = deps.dmRepo?.unreadFor(agent.id, 3) ?? [];
     const { system, user } = buildContext({
-      agent, peers: allAgents, balances, topRel, bottomRel, recent,
+      agent, peers: allAgents, balancesByAsset, topRel, bottomRel, recent,
       arenaInjection: queued?.prompt,
       board,
-      dms: dmsList
+      dms: dmsList,
+      preferredAssets: AGENT_ASSET_PREF[agent.id] ?? ["USD/2"]
     });
 
     deps.emit({ kind: "tick-start", agentId: agent.id, tickId, at: Date.now(),
