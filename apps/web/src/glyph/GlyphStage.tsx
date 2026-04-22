@@ -10,6 +10,13 @@ import TopRail from "./hud/TopRail";
 import BottomRail from "./hud/BottomRail";
 import { useCityStore } from "../state/city-store";
 
+// Existing panels — mounted as overlays so click handlers on the canvas work.
+// Wrapped in .legacy-panels so Glyph-token aliases apply (see shell.css).
+import AgentPanel from "../components/AgentPanel";
+import BuildingPanel from "../components/BuildingPanel";
+import TxPanel from "../components/TxPanel";
+import { ArenaBar } from "../components/ArenaBar";
+
 const ORCH_BASE = process.env.NEXT_PUBLIC_CITY_HTTP_URL ?? process.env.NEXT_PUBLIC_ORCH_HTTP ?? "http://127.0.0.1:3071";
 const WS_URL = process.env.NEXT_PUBLIC_CITY_WS ?? "ws://127.0.0.1:3070";
 
@@ -67,6 +74,17 @@ export default function GlyphStage() {
       <IntentBoardRail adapter={adapter} />
       <TickerRail adapter={adapter} />
       <BottomRail adapter={adapter} />
+
+      {/* Overlay panels — positioned absolutely, escape the grid flow.
+          Wrapped in .legacy-panels so the legacy CSS-var names (--ink,
+          --paper, --dim, --mute, --gold, --scream, --hustle) alias to the
+          Glyph palette; panels keep working without per-component restyle. */}
+      <div className="legacy-panels">
+        <AgentPanel />
+        <BuildingPanel />
+        <TxPanel />
+        <ArenaBar />
+      </div>
     </div>
   );
 }

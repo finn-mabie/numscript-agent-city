@@ -76,7 +76,24 @@ export class GlyphScene extends Phaser.Scene {
     // Zone rectangles + labels
     for (const [code, z] of Object.entries(GLYPH_ZONES)) {
       const fillHex = Phaser.Display.Color.HexStringToColor(z.hex).color;
-      this.add.rectangle(z.x, z.y, z.w, z.h, fillHex, 0.07).setOrigin(0, 0);
+      // Fill rect is also the hit-area — clicking a zone opens BuildingPanel.
+      // Only zones with an ownerAgentId are clickable (skip "?").
+      const fill = this.add.rectangle(z.x, z.y, z.w, z.h, fillHex, 0.07).setOrigin(0, 0);
+      if (z.ownerAgentId) {
+        fill.setInteractive({ useHandCursor: true });
+        const buildingId = code.toLowerCase().replace(/_/g, "-");
+        // Map zone code → existing BuildingPanel id convention
+        const BUILDING_ID_MAP: Record<string, string> = {
+          MKT: "market", BNK: "bank", POS: "post_office",
+          INS: "inspector", POL: "pool", ESC: "escrow"
+        };
+        const panelId = BUILDING_ID_MAP[code] ?? buildingId;
+        fill.on("pointerup", () => {
+          window.dispatchEvent(new CustomEvent("nac:building-click", { detail: { buildingId: panelId } }));
+        });
+        fill.on("pointerover", () => fill.setFillStyle(fillHex, 0.14));
+        fill.on("pointerout",  () => fill.setFillStyle(fillHex, 0.07));
+      }
       const rect = this.add.graphics();
       rect.lineStyle(1, 0x0a4048, 1);
       rect.strokeRect(z.x, z.y, z.w, z.h);
@@ -116,6 +133,14 @@ export class GlyphScene extends Phaser.Scene {
       const txt = this.add.text(px, py, a.glyph, {
         fontFamily: FONT, fontSize: a.red ? "32px" : "28px", color: a.hex,
       }).setOrigin(0.5, 0.5);
+      // Clickable glyph → opens AgentPanel. Hit area sized to the glyph bounds
+      // (a bit bigger for finger-reach sanity).
+      txt.setInteractive({ useHandCursor: true });
+      txt.on("pointerup", () => {
+        window.dispatchEvent(new CustomEvent("nac:agent-click", { detail: { id: a.id } }));
+      });
+      txt.on("pointerover", () => txt.setShadow(0, 0, a.hex, 10, true, true));
+      txt.on("pointerout",  () => txt.setShadow());
       const lbl = this.add.text(px, py + (a.red ? 20 : 18), a.name.toUpperCase(), {
         fontFamily: FONT, fontSize: "8px", color: COLORS.inkDim,
         letterSpacing: 1,

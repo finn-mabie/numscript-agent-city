@@ -86,3 +86,29 @@
   margin-left: auto; display: flex; gap: 18px; align-items: center;
 }
 .br-spacer { flex: 1; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Legacy-panel compatibility shim.
+
+   The existing AgentPanel / BuildingPanel / TxPanel / ArenaBar / AgentCard
+   components use Tailwind classes that compile to CSS vars: bg-ink,
+   text-paper, text-dim, border-mute, text-gold, text-scream, text-hustle.
+   Those vars are defined in globals.css with warm-neutral pixel-city
+   values. When a panel is mounted inside .legacy-panels (i.e. on the
+   Glyph route), we want them to inherit the Glyph palette instead —
+   without touching the panel components themselves.
+
+   This block re-defines the legacy vars to Glyph equivalents ONLY within
+   the .legacy-panels scope. Panels automatically look native on Glyph;
+   the pixel-city /legacy route is unaffected.
+   ──────────────────────────────────────────────────────────────────── */
+.legacy-panels {
+  --ink:    #011E22;
+  --paper:  #D5E1E1;
+  --dim:    #7A9396;
+  --mute:   #0a4048;
+  --gold:   #D4A24A;
+  --scream: #E5534B;
+  --hustle: #8B7537;
+  font-family: var(--font-mono);
+}
