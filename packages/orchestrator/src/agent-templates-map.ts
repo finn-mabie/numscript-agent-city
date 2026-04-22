@@ -14,3 +14,22 @@ export const AGENT_TEMPLATE_MAP: Record<string, string[]> = {
   "009": ["dispute_arbitration", "escrow_hold", "escrow_release", "escrow_refund", "refund"],
   "010": []
 };
+
+/**
+ * Asset-preference hints injected into each agent's system prompt. Agents
+ * are told these are the assets they "care about" — they'll be biased to
+ * price offers in these, accept tips in these, etc. Not enforced at the
+ * template layer — just a flavor nudge.
+ */
+export const AGENT_ASSET_PREF: Record<string, string[]> = {
+  "001": ["USD/2", "EUR/2"],                              // Alice — market-maker, currencies
+  "002": ["USD/2", "EUR/2", "STRAWBERRY/0"],              // Bob — takes anything as gig fee
+  "003": ["USD/2", "EUR/2"],                              // Carol — fees in currency
+  "004": ["USD/2", "EUR/2"],                              // Dave — no commodity credit
+  "005": ["USD/2", "COMPUTEHOUR/0"],                     // Eve — accepts compute as payment
+  "006": ["USD/2", "STRAWBERRY/0"],                       // Frank — strawberry tips flavor
+  "007": ["USD/2", "STRAWBERRY/0", "COMPUTEHOUR/0"],     // Grace — creative tips
+  "008": ["USD/2", "STRAWBERRY/0"],                       // Heidi — strawberry yield pool
+  "009": ["USD/2", "EUR/2"],                              // Ivan — disputes in currency
+  "010": ["USD/2", "EUR/2", "STRAWBERRY/0", "COMPUTEHOUR/0"] // Judy — probes anything
+};
