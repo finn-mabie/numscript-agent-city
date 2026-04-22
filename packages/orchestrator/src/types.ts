@@ -48,7 +48,8 @@ export type CityEventKind =
   | "arena-submit"
   | "arena-resolved"
   | "offer-posted"
-  | "offer-closed";
+  | "offer-closed"
+  | "dm-sent";
 
 export interface CityEvent {
   kind: CityEventKind;

@@ -22,7 +22,8 @@ export type CityEvent =
   | (Base & { kind: "arena-submit";        data: { attackId: string; targetAgentId: AgentId; promptPreview: string; submittedAt: number } })
   | (Base & { kind: "arena-resolved";      data: { attackId: string; outcome: "committed" | "rejected" | "idle"; phase: RejectionPhase | null; code: string | null; tickId: string } })
   | (Base & { kind: "offer-posted"; data: { offerId: string; authorAgentId: AgentId; text: string; inReplyTo: string | null; expiresAt: number } })
-  | (Base & { kind: "offer-closed"; data: { offerId: string; closedByTx: string; closedByAgent: AgentId; closedAt: number } });
+  | (Base & { kind: "offer-closed"; data: { offerId: string; closedByTx: string; closedByAgent: AgentId; closedAt: number } })
+  | (Base & { kind: "dm-sent"; data: { dmId: string; fromAgentId: AgentId; toAgentId: AgentId; preview: string; inReplyTo: string | null; inReplyKind: "dm" | "offer" | null } });
 
 export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler" | "exception";
 

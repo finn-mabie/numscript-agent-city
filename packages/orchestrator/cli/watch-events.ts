@@ -34,6 +34,8 @@ function format(e: CityEvent): string {
       return `${head} ${dim("offer")} ${(e.data as any).text?.slice(0, 60) ?? ""}`;
     case "offer-closed":
       return `${head} ${dim("offer-closed")} ${(e.data as any).offerId}`;
+    case "dm-sent":
+      return `${head} ${dim("dm→")} ${(e.data as any).toAgentId} ${dim("·")} ${(e.data as any).preview?.slice(0, 40) ?? ""}`;
     default: {
       const _exhaustive: never = e.kind;
       return `${head} ${dim(`(unhandled ${(_exhaustive as any)})`)}`;
