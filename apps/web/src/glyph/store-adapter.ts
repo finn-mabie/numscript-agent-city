@@ -47,8 +47,24 @@ export interface GlyphAdapter {
 
 export function createGlyphAdapter(): GlyphAdapter {
   const listeners: Record<string, Set<Listener>> = {};
+
+  // Buffer events for each kind until at least one listener registers.
+  // Phaser's scene.create() runs asynchronously after the React component
+  // mounts, and React HUD components also hook listeners via useEffect —
+  // both paths can miss the initial flood of events triggered by /snapshot
+  // hydrate. Buffering ensures no event is lost to that race.
+  const BUFFER_CAP = 200;
+  const buffers: Record<string, AnyGlyphEvent[]> = {};
+
   const emit = (ev: string, p: AnyGlyphEvent) => {
-    listeners[ev]?.forEach((fn) => fn(p));
+    const ls = listeners[ev];
+    if (ls && ls.size > 0) {
+      ls.forEach((fn) => fn(p));
+    } else {
+      const buf = (buffers[ev] ||= []);
+      buf.push(p);
+      if (buf.length > BUFFER_CAP) buf.shift();
+    }
   };
 
   // Track which entries we've already emitted for so reconnects / rebuilds
@@ -108,7 +124,16 @@ export function createGlyphAdapter(): GlyphAdapter {
   });
 
   return {
-    on(ev, fn) { (listeners[ev] ||= new Set()).add(fn); },
+    on(ev, fn) {
+      (listeners[ev] ||= new Set()).add(fn);
+      // Flush any buffered events for this kind — catches the mount-race
+      // where events arrive before the scene / HUD has subscribed.
+      const pending = buffers[ev];
+      if (pending && pending.length > 0) {
+        buffers[ev] = [];
+        for (const p of pending) fn(p);
+      }
+    },
     off(ev, fn) { listeners[ev]?.delete(fn); },
     tick() { /* no-op */ },
     destroy() { unsub(); }
