@@ -1,6 +1,7 @@
 // apps/web/src/glyph/store-adapter.ts
 import { useCityStore } from "../state/city-store";
 import { barrierKindFor } from "../phaser/barrier";
+import { glyphAgentById } from "./agent-map";
 
 export type GlyphBarrierKind = "schema" | "overdraft" | "unknown" | "seen";
 
@@ -72,7 +73,28 @@ export function createGlyphAdapter(): GlyphAdapter {
   const emittedTickIds = new Set<string>();
   const emittedOfferIds = new Set<string>();
 
+  // The first subscriber fire is typically triggered by /snapshot hydrate,
+  // which floods ~200 historical entries into the store. We don't want to
+  // replay the whole history as a flood of receipts/barriers on page load.
+  // Instead, on first fire we mark everything as "already emitted" silently,
+  // then start streaming from the next update onward.
+  let seeded = false;
+
   const unsub = useCityStore.subscribe((s, prev) => {
+    if (!seeded) {
+      for (const r of s.recent) emittedTickIds.add(r.tickId);
+      for (const id of Object.keys(s.offers)) emittedOfferIds.add(id);
+      seeded = true;
+      // Still emit one tick snapshot so the rails show the current counters
+      // right away (not stuck at 0 until the next event).
+      emit("tick", {
+        tick: s.ticksToday,
+        commits: s.committedToday,
+        rejects: s.rejectedToday
+      } as GlyphTickEvent);
+      return;
+    }
+
     // New recent entries → commit/reject
     for (const r of s.recent) {
       if (emittedTickIds.has(r.tickId)) continue;
@@ -88,6 +110,16 @@ export function createGlyphAdapter(): GlyphAdapter {
         emit("commit", {
           id: r.tickId, from: r.agentId, to: peer, amount, txid
         } as GlyphCommitEvent);
+        // Move the acting agent briefly toward their counterparty's zone —
+        // makes the city feel alive. Skip for post_offer / self-txs.
+        if (r.templateId && r.templateId !== "post_offer" && peer !== r.agentId) {
+          const peerHome = glyphAgentById(peer)?.home;
+          if (peerHome && peerHome !== "?") {
+            emit("agent-move", {
+              id: r.agentId, fromZone: "", toZone: peerHome, durationMs: 1100
+            } as GlyphMoveEvent);
+          }
+        }
       } else if (r.outcome === "rejected") {
         emittedTickIds.add(r.tickId);
         const barrier = mapBarrier(r.errorPhase, r.errorCode);
@@ -108,7 +140,7 @@ export function createGlyphAdapter(): GlyphAdapter {
         from: o.authorAgentId,
         to: o.inReplyTo ?? o.authorAgentId,
         kind: o.inReplyTo ? "reply" : "offer",
-        amount: 0,
+        amount: parseAmountFromText(o.text),
         summary: o.text.length > 60 ? o.text.slice(0, 57).trimEnd() + "…" : o.text,
         parent: o.inReplyTo ?? undefined,
         judy: o.authorAgentId === "010"
@@ -138,6 +170,19 @@ export function createGlyphAdapter(): GlyphAdapter {
     tick() { /* no-op */ },
     destroy() { unsub(); }
   };
+}
+
+/**
+ * Pull the first plausible dollar amount out of an offer's freeform text.
+ * Offers don't have a structured price field, but agents routinely write
+ * "for $8" or "pay $15" style phrases. Returns 0 if none found.
+ */
+function parseAmountFromText(text: string): number {
+  // Match $N, $N.NN, $1,000 — first occurrence
+  const m = text.match(/\$\s?([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)/);
+  if (!m) return 0;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
 }
 
 function amountFromParams(params: unknown): number {

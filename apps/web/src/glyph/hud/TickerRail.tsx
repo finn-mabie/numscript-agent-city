@@ -42,8 +42,8 @@ export default function TickerRail({ adapter }: { adapter: GlyphAdapter }) {
             <span className="tk-tx">{r.txid}</span>
             <span className="tk-who">{glyphOf(r.from)}→{typeof r.to === "string" && r.to.length === 1 ? glyphOf(r.to) : r.to}</span>
             {r.kind === "commit"
-              ? <span className="tk-amt" style={{ color: "#BAEABC" }}>✓ ${r.amount}</span>
-              : <span className="tk-amt" style={{ color: r.barrier ? BARRIER_HEX[r.barrier] : "#E5534B" }}>{r.barrier ? BARRIER_SIG[r.barrier] : "⊘"} ${r.amount}</span>}
+              ? <span className="tk-amt" style={{ color: "#BAEABC" }}>✓{r.amount > 0 ? ` $${r.amount}` : ""}</span>
+              : <span className="tk-amt" style={{ color: r.barrier ? BARRIER_HEX[r.barrier] : "#E5534B" }}>{r.barrier ? BARRIER_SIG[r.barrier] : "⊘"}{r.amount > 0 ? ` $${r.amount}` : ""}</span>}
           </div>
         ))}
       </div>

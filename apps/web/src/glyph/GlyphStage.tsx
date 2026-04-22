@@ -56,6 +56,9 @@ export default function GlyphStage() {
       width: CANVAS_W,
       height: CANVAS_H,
       transparent: true,
+      // Crisp text on HiDPI: antialias on, roundPixels off. Per-text calls
+      // to setResolution(2) happen inside GlyphScene.
+      render: { antialias: true, pixelArt: false, roundPixels: false, antialiasGL: true },
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
       scene: [new GlyphScene(adapter)]
     });

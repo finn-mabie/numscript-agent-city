@@ -40,9 +40,11 @@ export interface TickDeps {
 // set SLOW_TICKS=1 for the original 7-13 min "realistic" pacing when you want
 // the demo to mirror production rhythm. TICK_MIN_MS / TICK_MAX_MS still win
 // when set explicitly.
+// Demo default: 8-18s per agent. With 10 agents + staggered jitter that's
+// roughly 1 tick per 1-2s citywide — "lively but not overwhelming."
 const SLOW = process.env.SLOW_TICKS === "1";
-const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (SLOW ? 7 * 60 * 1000  : 20_000));
-const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (SLOW ? 13 * 60 * 1000 : 40_000));
+const MIN_TICK_INTERVAL_MS = Number(process.env.TICK_MIN_MS ?? (SLOW ? 7 * 60 * 1000  :  8_000));
+const MAX_TICK_INTERVAL_MS = Number(process.env.TICK_MAX_MS ?? (SLOW ? 13 * 60 * 1000 : 18_000));
 const LOW_BALANCE_TRACKER = new Map<string, number>();
 const OFFER_TTL_MS = 5 * 60_000;
 

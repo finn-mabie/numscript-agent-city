@@ -78,7 +78,7 @@ export default function IntentBoardRail({ adapter }: { adapter: GlyphAdapter }) 
               <span className="ib-who" style={{ color: hexOf(t.from) }}>
                 {glyphOf(t.from)} {t.judy ? "" : "→"} {t.judy ? "" : glyphOf(t.to)}
               </span>
-              <span className="ib-amt">${t.amount}</span>
+              <span className="ib-amt">{t.amount > 0 ? `$${t.amount}` : ""}</span>
               <div className="ib-sum">{t.summary}</div>
               {t.state === "committed" && (
                 <div className="ib-state" style={{ color: "#BAEABC" }}>✓ COMMIT {t.txid}</div>

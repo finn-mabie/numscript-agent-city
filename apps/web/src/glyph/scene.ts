@@ -17,7 +17,7 @@ import {
   hexOf,
   type GlyphAgent,
 } from "./agent-map";
-import { GLYPH_ZONES, CANVAS_W, CANVAS_H } from "./zones";
+import { GLYPH_ZONES, CANVAS_W, CANVAS_H, type GlyphZone } from "./zones";
 import type {
   GlyphAdapter,
   GlyphIntentEvent,
@@ -111,30 +111,44 @@ export class GlyphScene extends Phaser.Scene {
 
       this.add.text(z.x + 10, z.y + 6, `_${code}/`, {
         fontFamily: FONT, fontSize: "10px", color: z.hex,
-      }).setAlpha(0.95);
+      }).setResolution(2).setAlpha(0.95);
       this.add.text(z.x + 10 + code.length * 6 + 14, z.y + 6, z.name, {
         fontFamily: FONT, fontSize: "10px", color: COLORS.inkDim,
-      });
+      }).setResolution(2);
 
       // Mini ASCII for this zone (ascii lives directly on GlyphZone)
       if (z.ascii) {
         this.add.text(z.x + 14, z.y + 30, z.ascii, {
           fontFamily: FONT, fontSize: "10px", color: z.hex,
           lineSpacing: 1,
-        }).setAlpha(0.55);
+        }).setResolution(2).setAlpha(0.55);
       }
     }
 
-    // Agents
+    // Agents — assigned slots so multiple agents in one zone don't stack.
+    // Each zone gets a horizontal grid of up to 3 slots in the bottom half;
+    // agents wobble within their slot, never crossing each other.
+    const zoneOccupants = new Map<string, string[]>(); // zone code → agent ids in residence
     for (const a of GLYPH_AGENTS) {
-      const z = GLYPH_ZONES[a.home === "?" ? "?" : a.home];
-      const px = z.x + z.w / 2 + (Math.random() - 0.5) * (z.w * 0.6);
-      const py = z.y + z.h / 2 + 8 + (Math.random() - 0.5) * (z.h * 0.4);
+      const zoneCode = a.home === "?" ? "?" : a.home;
+      const list = zoneOccupants.get(zoneCode) ?? [];
+      list.push(a.id);
+      zoneOccupants.set(zoneCode, list);
+    }
+
+    for (const a of GLYPH_AGENTS) {
+      const zoneCode = a.home === "?" ? "?" : a.home;
+      const z = GLYPH_ZONES[zoneCode];
+      const cohort = zoneOccupants.get(zoneCode) ?? [a.id];
+      const idx = cohort.indexOf(a.id);
+      const n = cohort.length;
+      // Horizontal slots, clustered in the lower 40% of the zone (below ASCII art)
+      const slotW = z.w / (n + 1);
+      const px = z.x + slotW * (idx + 1);
+      const py = z.y + z.h * 0.72;
       const txt = this.add.text(px, py, a.glyph, {
         fontFamily: FONT, fontSize: a.red ? "32px" : "28px", color: a.hex,
-      }).setOrigin(0.5, 0.5);
-      // Clickable glyph → opens AgentPanel. Hit area sized to the glyph bounds
-      // (a bit bigger for finger-reach sanity).
+      }).setResolution(2).setOrigin(0.5, 0.5);
       txt.setInteractive({ useHandCursor: true });
       txt.on("pointerup", () => {
         window.dispatchEvent(new CustomEvent("nac:agent-click", { detail: { id: a.id } }));
@@ -144,12 +158,12 @@ export class GlyphScene extends Phaser.Scene {
       const lbl = this.add.text(px, py + (a.red ? 20 : 18), a.name.toUpperCase(), {
         fontFamily: FONT, fontSize: "8px", color: COLORS.inkDim,
         letterSpacing: 1,
-      }).setOrigin(0.5, 0.5);
+      }).setResolution(2).setOrigin(0.5, 0.5);
 
       this.agentSprites.set(a.id, {
         txt, lbl, agent: a,
         home: { x: px, y: py },
-        zone: a.home === "?" ? "?" : a.home,
+        zone: zoneCode,
         wobblePhase: Math.random() * Math.PI * 2,
       });
     }
@@ -162,12 +176,14 @@ export class GlyphScene extends Phaser.Scene {
   }
 
   update(_t: number, _dt: number) {
-    // Idle wobble
+    // Idle wobble — clamped so an agent never drifts into a neighbor's slot
+    // or out of their home zone. Smaller horizontal range (±4px) since slots
+    // are narrow; a bit more vertical since the slot has headroom.
     const t = this.time.now / 1000;
     for (const s of this.agentSprites.values()) {
       if (s.tweenActive) continue;
-      const dx = Math.sin(t * 0.8 + s.wobblePhase) * 3;
-      const dy = Math.cos(t * 0.7 + s.wobblePhase * 1.3) * 2;
+      const dx = Math.sin(t * 0.9 + s.wobblePhase) * 4;
+      const dy = Math.cos(t * 0.8 + s.wobblePhase * 1.3) * 5;
       s.txt.x = s.home.x + dx;
       s.txt.y = s.home.y + dy;
       s.lbl.x = s.home.x + dx;
@@ -204,21 +220,43 @@ export class GlyphScene extends Phaser.Scene {
   private onAgentMove({ id, toZone, durationMs }: GlyphMoveEvent) {
     const s = this.agentSprites.get(id);
     if (!s) return;
-    const target = this.zoneCenter(toZone);
-    // offset slightly inside zone
-    target.x += (Math.random() - 0.5) * 40;
-    target.y += (Math.random() - 0.5) * 30;
-    s.zone = toZone;
+    const z = (GLYPH_ZONES as Record<string, GlyphZone | undefined>)[toZone];
+    if (!z) return;
+    // Park at a corner of the target zone's floor, offset from the center —
+    // the host's slots occupy the center so the visitor stays out of the way.
+    // Deterministic jitter per-visitor keeps repeat visitors slightly offset.
+    const offsetSign = (id.charCodeAt(id.length - 1) % 2) === 0 ? -1 : 1;
+    const visitX = z.x + z.w * 0.5 + offsetSign * (z.w * 0.28);
+    const visitY = z.y + z.h * 0.78;
+    const origHome = { x: s.home.x, y: s.home.y };
+    const origZone = s.zone;
+
     s.tweenActive = true;
+    s.zone = toZone;
+
+    // Outbound glide — to counterparty zone
     this.tweens.add({
       targets: [s.txt, s.lbl],
-      x: (_tgt: Phaser.GameObjects.Text) => target.x,
-      y: (tgt: Phaser.GameObjects.Text) => tgt === s.lbl ? target.y + (s.agent.red ? 20 : 18) : target.y,
+      x: (tgt: Phaser.GameObjects.Text) => visitX,
+      y: (tgt: Phaser.GameObjects.Text) => tgt === s.lbl ? visitY + (s.agent.red ? 20 : 18) : visitY,
       duration: durationMs,
       ease: "Sine.easeInOut",
       onComplete: () => {
-        s.tweenActive = false;
-        s.home = { x: target.x, y: target.y };
+        // Linger briefly, then return home so they don't stack in peer zones
+        this.time.delayedCall(1800, () => {
+          this.tweens.add({
+            targets: [s.txt, s.lbl],
+            x: (tgt: Phaser.GameObjects.Text) => origHome.x,
+            y: (tgt: Phaser.GameObjects.Text) => tgt === s.lbl ? origHome.y + (s.agent.red ? 20 : 18) : origHome.y,
+            duration: durationMs,
+            ease: "Sine.easeInOut",
+            onComplete: () => {
+              s.tweenActive = false;
+              s.zone = origZone;
+              // s.home is unchanged — they return to the same slot
+            },
+          });
+        });
       },
     });
   }
@@ -233,10 +271,10 @@ export class GlyphScene extends Phaser.Scene {
     bg.setOrigin(0, 0);
     const head = this.add.text(6, 4, kind === "offer" ? "◆ OFFER" : "↘ REPLY", {
       fontFamily: FONT, fontSize: "8px", color, letterSpacing: 1.2,
-    });
+    }).setResolution(2);
     const body = this.add.text(6, 16, `$${amount}`, {
       fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
-    });
+    }).setResolution(2);
     bubble.add([bg, head, body]);
     bubble.setAlpha(0);
     this.tweens.add({ targets: bubble, alpha: 1, duration: 120 });
@@ -253,7 +291,7 @@ export class GlyphScene extends Phaser.Scene {
     for (let i = 0; i < N; i++) {
       const d = this.add.text(from.x, from.y, "$", {
         fontFamily: FONT, fontSize: "11px", color,
-      }).setOrigin(0.5);
+      }).setResolution(2).setOrigin(0.5);
       d.setAlpha(0);
       dots.push(d);
       this.tweens.add({
@@ -276,19 +314,19 @@ export class GlyphScene extends Phaser.Scene {
     const pin = this.add.rectangle(0, 0, 2, 58, 0xbaeabc).setOrigin(0, 0);
     const head = this.add.text(10, 6, `COMMIT · tx ${txid}`, {
       fontFamily: FONT, fontSize: "8px", color: COLORS.mint, letterSpacing: 1.2,
-    });
+    }).setResolution(2);
     const l1 = this.add.text(10, 20, `+ $${amount.toFixed(2)}`, {
       fontFamily: FONT, fontSize: "11px", color: COLORS.gold,
-    });
+    }).setResolution(2);
     // Resolve 3-digit agent ids to glyphs for the transfer line
     const fromGlyph = glyphOf(from);
     const toGlyph = glyphOf(to);
     const l2 = this.add.text(10, 34, `${fromGlyph} → ${toGlyph}`, {
       fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
-    });
+    }).setResolution(2);
     const l3 = this.add.text(10, 46, "OK", {
       fontFamily: FONT, fontSize: "9px", color: COLORS.mint,
-    });
+    }).setResolution(2);
     c.add([bg, pin, head, l1, l2, l3]);
     c.setAlpha(0);
     this.tweens.add({ targets: c, alpha: 1, y: c.y - 6, duration: 180 });
@@ -327,28 +365,28 @@ export class GlyphScene extends Phaser.Scene {
     const titleBar = this.add.rectangle(-130, -65, 260, 18, colorInt, 1).setOrigin(0, 0);
     const titleTxt = this.add.text(-124, -62, "_CAGE/ BARRIER ENGAGED", {
       fontFamily: FONT, fontSize: "8px", color: "#011E22", letterSpacing: 1.2,
-    });
+    }).setResolution(2);
     const titleCode = this.add.text(124, -62, cfg.code, {
       fontFamily: FONT, fontSize: "8px", color: "#011E22", letterSpacing: 1.2,
-    }).setOrigin(1, 0);
+    }).setResolution(2).setOrigin(1, 0);
 
     const sigil = this.add.text(-120, -35, cfg.sigil, {
       fontFamily: FONT, fontSize: "28px", color: cfg.color,
-    });
+    }).setResolution(2);
     const heading = this.add.text(-80, -32, cfg.title, {
       fontFamily: FONT, fontSize: "13px", color: COLORS.ink,
-    });
+    }).setResolution(2);
     const subline = this.add.text(-80, -16, `LEDGER REFUSED · TX ${txid}`, {
       fontFamily: FONT, fontSize: "8px", color: COLORS.inkDim, letterSpacing: 1.2,
-    });
+    }).setResolution(2);
 
     const rows = cfg.rows.flatMap((r, i) => {
       const k = this.add.text(-120, 6 + i * 16, String(r[0]).padEnd(8), {
         fontFamily: FONT, fontSize: "10px", color: COLORS.inkDim,
-      });
+      }).setResolution(2);
       const v = this.add.text(-56, 6 + i * 16, String(r[1]), {
         fontFamily: FONT, fontSize: "10px", color: r[2] ?? COLORS.ink,
-      });
+      }).setResolution(2);
       return [k, v];
     });
 
@@ -356,10 +394,10 @@ export class GlyphScene extends Phaser.Scene {
     const sender = glyphAgentById(from);
     const bySig = this.add.text(-120, 54, "by", {
       fontFamily: FONT, fontSize: "10px", color: COLORS.inkDim,
-    });
+    }).setResolution(2);
     const byVal = this.add.text(-56, 54, sender ? `${sender.glyph} ${sender.name}` : from, {
       fontFamily: FONT, fontSize: "10px", color: COLORS.red,
-    });
+    }).setResolution(2);
 
     c.add([bg, titleBar, titleTxt, titleCode, sigil, heading, subline, ...rows, bySig, byVal]);
     c.setScale(0.8);
