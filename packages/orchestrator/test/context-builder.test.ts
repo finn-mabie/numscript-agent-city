@@ -12,8 +12,10 @@ const peers: AgentRecord[] = [
   { ...agent, id: "002", name: "Bob", role: "Courier", tagline: "", color: "" },
   { ...agent, id: "003", name: "Carol", role: "Inspector", tagline: "", color: "" }
 ];
-const balances: Record<string, number> = {
-  "@agents:001:available": 10000, "@agents:002:available": 8000, "@agents:003:available": 500
+const balancesByAsset: Record<string, Record<string, number>> = {
+  "@agents:001:available": { "USD/2": 10000 },
+  "@agents:002:available": { "USD/2": 8000 },
+  "@agents:003:available": { "USD/2": 500 }
 };
 const topRel: Relationship[] = [
   { agentId: "001", peerId: "002", trust: 0.6, lastInteractionAt: 0 }
@@ -29,7 +31,7 @@ describe("buildContext with arenaInjection", () => {
   const baseInput = {
     agent: { id: "010", name: "Judy", role: "Red Agent", tagline: "probe the cage", color: "#0f0", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
     peers: [],
-    balances: { "@agents:010:available": 0 },
+    balancesByAsset: { "@agents:010:available": { "USD/2": 0 } },
     topRel: [],
     bottomRel: [],
     recent: []
@@ -58,7 +60,7 @@ describe("buildContext with arenaInjection", () => {
 
 describe("buildContext", () => {
   it("embeds identity, balance, roster, relationships, events", () => {
-    const { system, user } = buildContext({ agent, peers, balances, topRel, bottomRel, recent });
+    const { system, user } = buildContext({ agent, peers, balancesByAsset, topRel, bottomRel, recent });
     expect(system).toContain("Alice");
     expect(system).toContain("Market-Maker");
     expect(user).toContain("$100.00"); // 10000 minor units → $100.00
@@ -72,7 +74,7 @@ describe("buildContext", () => {
 
   it("includes hustle-mode line when the agent is broke", () => {
     const broke = { ...agent, hustleMode: 1 as const };
-    const { system } = buildContext({ agent: broke, peers, balances, topRel, bottomRel, recent });
+    const { system } = buildContext({ agent: broke, peers, balancesByAsset, topRel, bottomRel, recent });
     expect(system.toLowerCase()).toContain("nearly broke");
   });
 });
@@ -81,7 +83,7 @@ describe("buildContext with board", () => {
   const baseInput = {
     agent: { id: "001", name: "Alice", role: "Market", tagline: "t", color: "#111", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
     peers: [{ id: "002", name: "Bob", role: "Courier", tagline: "", color: "#222", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 }],
-    balances: { "@agents:001:available": 100, "@agents:002:available": 0 },
+    balancesByAsset: { "@agents:001:available": { "USD/2": 100 }, "@agents:002:available": { "USD/2": 0 } },
     topRel: [],
     bottomRel: [],
     recent: []
@@ -116,7 +118,7 @@ describe("buildContext with dms", () => {
       { id: "002", name: "Bob", role: "Courier", tagline: "", color: "#222", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
       { id: "003", name: "Carol", role: "Inspector", tagline: "", color: "#333", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 }
     ],
-    balances: { "@agents:001:available": 100 },
+    balancesByAsset: { "@agents:001:available": { "USD/2": 100 } },
     topRel: [],
     bottomRel: [],
     recent: []
@@ -141,5 +143,37 @@ describe("buildContext with dms", () => {
     expect(a).not.toContain("direct messages");
     const { user: b } = buildContext(baseInput);
     expect(b).not.toContain("direct messages");
+  });
+});
+
+describe("buildContext with multi-asset balances", () => {
+  it("renders all non-zero asset balances", () => {
+    const { user } = buildContext({
+      agent: { id: "008", name: "Heidi", role: "Pool", tagline: "t", color: "#7FD6A8", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
+      peers: [],
+      balancesByAsset: {
+        "@agents:008:available": { "USD/2": 10000, "STRAWBERRY/0": 60, "COMPUTEHOUR/0": 5 }
+      },
+      preferredAssets: ["USD/2", "STRAWBERRY/0"],
+      topRel: [], bottomRel: [], recent: []
+    });
+    expect(user).toContain("Your balances:");
+    expect(user).toContain("USD/2");
+    expect(user).toContain("$100.00");
+    expect(user).toContain("STRAWBERRY/0");
+    expect(user).toContain("60 🍓");
+    expect(user).toContain("COMPUTEHOUR/0");
+    expect(user).toContain("5 💻");
+    expect(user).toContain("Assets you care about: USD/2, STRAWBERRY/0");
+  });
+
+  it("handles an agent with zero balances everywhere", () => {
+    const { user } = buildContext({
+      agent: { id: "001", name: "Alice", role: "Market", tagline: "t", color: "#D4A24A", nextTickAt: 0, hustleMode: 0 as 0, createdAt: 0, updatedAt: 0 },
+      peers: [],
+      balancesByAsset: {},
+      topRel: [], bottomRel: [], recent: []
+    });
+    expect(user).toContain("(nothing — you're completely empty)");
   });
 });

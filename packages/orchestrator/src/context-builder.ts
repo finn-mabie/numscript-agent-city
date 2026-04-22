@@ -1,10 +1,14 @@
 import type { AgentRecord, Relationship, IntentLogEntry } from "./types.js";
 import type { OfferRecord, DmRecord } from "./repositories.js";
+import { formatAmount } from "./assets.js";
 
 export interface ContextInput {
   agent: AgentRecord;
   peers: AgentRecord[];
-  balances: Record<string, number>; // account address → USD/2 minor units
+  /** account address → asset code → minor units. Self balance is balancesByAsset[@agents:{id}:available]. */
+  balancesByAsset: Record<string, Record<string, number>>;
+  /** Assets this agent cares about (nudge, not enforcement). */
+  preferredAssets?: string[];
   topRel: Relationship[];
   bottomRel: Relationship[];
   recent: IntentLogEntry[];
@@ -43,12 +47,24 @@ function fmtEvent(e: IntentLogEntry): string {
 }
 
 export function buildContext(input: ContextInput): BuiltContext {
-  const { agent, peers, balances, topRel, bottomRel, recent } = input;
-  const selfBalance = balances[availableOf(agent.id)] ?? 0;
+  const { agent, peers, topRel, bottomRel, recent } = input;
+  const selfAcct = `@agents:${agent.id}:available`;
+  const selfBalancesMap = input.balancesByAsset[selfAcct] ?? {};
+  const selfBalance = selfBalancesMap["USD/2"] ?? 0;  // keep for bracket logic + peer lines
+  const balanceLines = Object.entries(selfBalancesMap)
+    .filter(([, amt]) => amt > 0)
+    .map(([code, amt]) => `  ${code.padEnd(16)} ${formatAmount(code, amt)}`);
+  const balancesBlock = balanceLines.length === 0
+    ? "  (nothing — you're completely empty)"
+    : balanceLines.join("\n");
+
+  const preferredLine = (input.preferredAssets && input.preferredAssets.length > 0)
+    ? `Assets you care about: ${input.preferredAssets.join(", ")}`
+    : "";
 
   const peerLines = peers
     .filter((p) => p.id !== agent.id)
-    .map((p) => fmtPeerLine(p, balances[availableOf(p.id)] ?? 0))
+    .map((p) => fmtPeerLine(p, input.balancesByAsset[availableOf(p.id)]?.["USD/2"] ?? 0))
     .join("\n");
 
   const topLines = topRel.length ? topRel.map((r) => fmtRelLine(r, peers)).join("\n") : "  (none)";
@@ -59,7 +75,6 @@ export function buildContext(input: ContextInput): BuiltContext {
     ? "You are nearly broke. Prioritize earning. Offer services at reduced fees if needed.\n"
     : "";
 
-  const selfAcct = `@agents:${agent.id}:available`;
   const system = [
     `You are ${agent.name}, the ${agent.role}. ${agent.tagline}`,
     ``,
@@ -180,7 +195,9 @@ export function buildContext(input: ContextInput): BuiltContext {
     : "";
 
   const user = [
-    `Your current balance: ${fmtUsd(selfBalance)}`,
+    `Your balances:`,
+    balancesBlock,
+    preferredLine,
     ``,
     `Trusted peers:`,
     topLines,
