@@ -30,7 +30,8 @@ export const SELF_OWNED_PARAMS: Record<string, string[]> = {
   refund:              ["merchant"],
   waterfall_pay:       ["agent_credits", "agent_main"],
   credit_line_charge:  ["agent_credit", "agent_main"],
-  liquidate_wallet:    ["from"]
+  liquidate_wallet:    ["from"],
+  commodity_swap:      ["agent_a"]
   // NOT self-owned (source is not an agent account):
   //   escrow_release, escrow_refund — source is @escrow:job:{id}
   //   revenue_split                 — source is @platform:pool:{name}

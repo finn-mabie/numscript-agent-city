@@ -1,0 +1,19 @@
+vars {
+  account  $agent_a
+  account  $agent_b
+  monetary $give
+  monetary $take
+  string   $swap_ref
+}
+
+send $give (
+  source      = $agent_a
+  destination = $agent_b
+)
+send $take (
+  source      = $agent_b
+  destination = $agent_a
+)
+
+set_tx_meta("type", "COMMODITY_SWAP")
+set_tx_meta("swap_ref", $swap_ref)

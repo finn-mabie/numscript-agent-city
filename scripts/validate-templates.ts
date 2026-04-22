@@ -11,14 +11,28 @@ type Balance = { [account: string]: { [asset: string]: number } };
 // Seed balances large enough for any example to succeed.
 function seedBalances(vars: Record<string, string>): Balance {
   const b: Balance = {};
+
+  // Collect all monetary assets referenced in vars (e.g. "USD/2 500", "STRAWBERRY/0 3").
+  const monetaryAssets: string[] = [];
   for (const v of Object.values(vars)) {
-    // Take account-like strings from vars and seed them $10,000 USD/2
+    const m = v.match(/^([A-Z][A-Z0-9]*\/[0-9]+)\s+[0-9]+$/);
+    if (m) monetaryAssets.push(m[1]);
+  }
+
+  for (const v of Object.values(vars)) {
+    // Take account-like strings from vars and seed them generously in every asset used.
     if (/^[a-zA-Z0-9_-]+(:[a-zA-Z0-9_-]+)+$/.test(v)) {
       b[v] = { "USD/2": 1_000_000 };
+      for (const asset of monetaryAssets) {
+        b[v][asset] = 1_000_000;
+      }
     }
   }
   // Always seed genesis
   b["mint:genesis"] = { "USD/2": 100_000_000_000 };
+  for (const asset of monetaryAssets) {
+    b["mint:genesis"][asset] = 100_000_000_000;
+  }
   return b;
 }
 
