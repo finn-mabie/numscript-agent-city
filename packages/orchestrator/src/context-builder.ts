@@ -18,6 +18,8 @@ export interface ContextInput {
   dms?: DmRecord[];
   /** Optional injection-time hook used by the board renderer for "Ns ago". Defaults to Date.now(). */
   nowMs?: number;
+  /** Active market info per asset — rendered as a "Market prices" block when present. */
+  market?: Array<{ assetCode: string; vwap: number | null; target: number | null; targetExpiresAt: number | null }>;
 }
 
 export interface BuiltContext {
@@ -181,6 +183,26 @@ export function buildContext(input: ContextInput): BuiltContext {
     ].join("\n");
   })();
 
+  const market = input.market ?? [];
+  const marketBlock = market.length === 0 ? "" : (() => {
+    // Only show assets that have a visitor target (otherwise the block adds
+    // noise for every asset on every tick). VWAP stays out of tick context —
+    // agents see it via frontend; too expensive to fetch N assets per tick.
+    const active = market.filter((m) => m.target !== null);
+    if (active.length === 0) return "";
+    const lines = active.map((m) =>
+      `  ${m.assetCode.padEnd(16)} visitor target: ${m.target}${m.vwap !== null ? `  (recent VWAP ${m.vwap.toFixed(2)})` : ""}`
+    );
+    return [
+      ``,
+      `[market prices — visitor-set targets on your assets]`,
+      ...lines,
+      `[end market]`,
+      `If a visitor sets a high target and you hold that asset, consider a commodity_swap to lock in the spread. The visitor cannot force you — they're a public signal, not a buyer.`,
+      ``
+    ].join("\n");
+  })();
+
   const injectionBlock = input.arenaInjection
     ? [
         ``,
@@ -212,6 +234,7 @@ export function buildContext(input: ContextInput): BuiltContext {
     recentLines,
     boardBlock,
     dmsBlock,
+    marketBlock,
     injectionBlock,
     `What's your next move?`
   ].join("\n");

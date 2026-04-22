@@ -14,10 +14,13 @@ import type { arenaRepo } from "./repositories.js";
 import { validateOfferText, newOfferId, OFFER_ID_RE } from "./offers.js";
 import { AGENT_TEMPLATE_MAP, AGENT_ASSET_PREF } from "./agent-templates-map.js";
 import type { dmRepo as dmRepoFactory } from "./repositories.js";
+import type { priceSignalRepo as priceSignalRepoFactory } from "./repositories.js";
 import { validateDmText, newDmId, DM_ID_RE } from "./dms.js";
+import { ASSET_REGISTRY } from "./assets.js";
 type ArenaRepo = ReturnType<typeof arenaRepo>;
 type OfferRepoT = ReturnType<typeof offerRepoFactory>;
 type DmRepoT = ReturnType<typeof dmRepoFactory>;
+type PriceSignalRepoT = ReturnType<typeof priceSignalRepoFactory>;
 
 export interface TickDeps {
   db: Database.Database;
@@ -39,6 +42,8 @@ export interface TickDeps {
   dmRepo?: DmRepoT;
   /** Called on every committed send_dm. run-city advances the recipient's nextTickAt. */
   advancePeerForDm?: (args: { senderAgentId: string; recipientAgentId: string; dmId: string }) => void;
+  /** Optional — when set, market block is injected into agent context and targets fan to all agents. */
+  priceSignalRepo?: PriceSignalRepoT;
 }
 
 // Tick intervals are env-configurable so demo/visual-testing can shorten
@@ -164,12 +169,30 @@ export async function tickAgent(
     const recent = log.recent(agent.id, 5);
     const board = deps.offerRepo?.openOffers(8, agent.id) ?? [];
     const dmsList = deps.dmRepo?.unreadFor(agent.id, 3) ?? [];
+
+    // Build market block — target from visitor price signal, vwap left null
+    // here to avoid N-assets-per-tick ledger fetches. The background ticker
+    // in run-city broadcasts vwap via WS; agents see targets directly.
+    const nowForMarket = Date.now();
+    const market = deps.priceSignalRepo
+      ? ASSET_REGISTRY.map((a) => {
+          const sig = deps.priceSignalRepo!.activeFor(a.code, nowForMarket);
+          return {
+            assetCode: a.code,
+            vwap: null as number | null,
+            target: sig?.targetPrice ?? null,
+            targetExpiresAt: sig?.expiresAt ?? null
+          };
+        })
+      : [];
+
     const { system, user } = buildContext({
       agent, peers: allAgents, balancesByAsset, topRel, bottomRel, recent,
       arenaInjection: queued?.prompt,
       board,
       dms: dmsList,
-      preferredAssets: AGENT_ASSET_PREF[agent.id] ?? ["USD/2"]
+      preferredAssets: AGENT_ASSET_PREF[agent.id] ?? ["USD/2"],
+      market: market.length > 0 ? market : undefined
     });
 
     deps.emit({ kind: "tick-start", agentId: agent.id, tickId, at: Date.now(),

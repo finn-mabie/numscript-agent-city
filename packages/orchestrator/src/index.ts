@@ -26,7 +26,7 @@ export { createRateLimiter } from "./rate-limit.js";
 export type { RateLimiter, RateLimiterOptions, RateLimitResult } from "./rate-limit.js";
 export { newOfferId, validateOfferText, POST_OFFER_TOOL, OFFER_ID_RE } from "./offers.js";
 export { newDmId, validateDmText, SEND_DM_TOOL, DM_ID_RE, DM_TEXT_MAX_LEN } from "./dms.js";
-export { dmRepo } from "./repositories.js";
+export { dmRepo, priceSignalRepo } from "./repositories.js";
 export type { DmRecord } from "./repositories.js";
 export { ASSET_REGISTRY, assetByCode, formatAmount, isCommodity } from "./assets.js";
 export type { Asset } from "./assets.js";

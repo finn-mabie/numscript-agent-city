@@ -35,8 +35,11 @@ import {
   anthropicLLM, tickAgent, startScheduler, startEventBus,
   createArenaQueue, arenaRepo,
   offerRepo,
-  dmRepo
+  dmRepo,
+  priceSignalRepo
 } from "../src/index.js";
+import { computeVwap, extractSwapSamples } from "../src/vwap.js";
+import { ASSET_REGISTRY } from "../src/assets.js";
 import type { CityEvent, TickOutcome } from "../src/index.js";
 import { startHttp } from "../src/http.js";
 
@@ -90,6 +93,10 @@ async function main() {
   const arena = arenaRepo(db);
   const offers = offerRepo(db);
   const dms = dmRepo(db);
+  const priceSignals = priceSignalRepo(db);
+  const priceSignalSalt = process.env.PRICE_SIGNAL_SALT && process.env.PRICE_SIGNAL_SALT.length >= 16
+    ? process.env.PRICE_SIGNAL_SALT
+    : randomBytes(24).toString("hex");
   const envSalt = process.env.ARENA_SALT;
   const saltIsValid = typeof envSalt === "string" && envSalt.length >= 16;
   const arenaSalt = saltIsValid ? envSalt! : randomBytes(24).toString("hex");
@@ -133,7 +140,19 @@ async function main() {
       });
     },
     offerRepo: offers,
-    dmRepo: dms
+    dmRepo: dms,
+    priceSignalRepo: priceSignals,
+    priceSignalSalt,
+    priceSignalRateLimit: { max: 2, windowMs: 5 * 60_000 },
+    onPriceSignalSet: (args) => {
+      bus.emit({
+        kind: "price-signal-set",
+        agentId: "-",
+        tickId: `signal:${args.signalId}`,
+        at: Date.now(),
+        data: args
+      });
+    },
   });
   console.error(`[city] http      http://127.0.0.1:${http.port}/snapshot (POST /arena)`);
 
@@ -157,6 +176,7 @@ async function main() {
           }
         },
         dmRepo: dms,
+        priceSignalRepo: priceSignals,
         advancePeerForDm: ({ recipientAgentId }) => {
           // Wake the DM recipient so they see the message within ~2 seconds
           // of its arrival. Only advances if their next tick is more than 2s
@@ -173,12 +193,41 @@ async function main() {
     })
   });
 
+  // Background VWAP ticker — every 30s, compute VWAP per asset from the
+  // last 10 min of ledger txs and broadcast via WS. Keeps sparklines
+  // moving even when trading is quiet.
+  const vwapTimer = setInterval(async () => {
+    for (const asset of ASSET_REGISTRY) {
+      try {
+        const txsRes = await ledger.get(
+          `/transactions?metadata[asset]=${encodeURIComponent(asset.code)}&pageSize=100`
+        );
+        const body = txsRes.body as any;
+        const rawTxs = Array.isArray(body?.cursor?.data) ? body.cursor.data : [];
+        const samples = extractSwapSamples(rawTxs, asset.code).filter(
+          (s) => s.timestamp >= Date.now() - 10 * 60_000
+        );
+        const vwap = computeVwap(samples);
+        bus.emit({
+          kind: "price-vwap-update",
+          agentId: "-",
+          tickId: `vwap:${asset.code}:${Date.now()}`,
+          at: Date.now(),
+          data: { assetCode: asset.code, vwap, samples: samples.length, asOf: Date.now() }
+        });
+      } catch {
+        // non-fatal
+      }
+    }
+  }, 30_000);
+
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     console.error("\n[city] shutting down…");
     await sched.stop();
+    clearInterval(vwapTimer);
     http.server.close();
     await bus.close();
     db.close();

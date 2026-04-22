@@ -23,7 +23,9 @@ export type CityEvent =
   | (Base & { kind: "arena-resolved";      data: { attackId: string; outcome: "committed" | "rejected" | "idle"; phase: RejectionPhase | null; code: string | null; tickId: string } })
   | (Base & { kind: "offer-posted"; data: { offerId: string; authorAgentId: AgentId; text: string; inReplyTo: string | null; expiresAt: number } })
   | (Base & { kind: "offer-closed"; data: { offerId: string; closedByTx: string; closedByAgent: AgentId; closedAt: number } })
-  | (Base & { kind: "dm-sent"; data: { dmId: string; fromAgentId: AgentId; toAgentId: AgentId; preview: string; inReplyTo: string | null; inReplyKind: "dm" | "offer" | null } });
+  | (Base & { kind: "dm-sent"; data: { dmId: string; fromAgentId: AgentId; toAgentId: AgentId; preview: string; inReplyTo: string | null; inReplyKind: "dm" | "offer" | null } })
+  | (Base & { kind: "price-signal-set"; data: { signalId: string; assetCode: string; targetPrice: number; expiresAt: number } })
+  | (Base & { kind: "price-vwap-update"; data: { assetCode: string; vwap: number | null; samples: number; asOf: number } });
 
 export type RejectionPhase = "load" | "validate" | "render" | "dry-run" | "commit" | "authorization" | "scheduler" | "exception";
 

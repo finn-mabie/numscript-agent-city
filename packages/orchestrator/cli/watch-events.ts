@@ -36,6 +36,10 @@ function format(e: CityEvent): string {
       return `${head} ${dim("offer-closed")} ${(e.data as any).offerId}`;
     case "dm-sent":
       return `${head} ${dim("dm→")} ${(e.data as any).toAgentId} ${dim("·")} ${(e.data as any).preview?.slice(0, 40) ?? ""}`;
+    case "price-signal-set":
+      return `${head} ${dim("price!")} ${(e.data as any).assetCode} → ${(e.data as any).targetPrice}`;
+    case "price-vwap-update":
+      return `${head} ${dim("vwap")} ${(e.data as any).assetCode} ${(e.data as any).vwap ?? "—"}`;
     default: {
       const _exhaustive: never = e.kind;
       return `${head} ${dim(`(unhandled ${(_exhaustive as any)})`)}`;

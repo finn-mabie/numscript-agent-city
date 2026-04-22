@@ -49,7 +49,9 @@ export type CityEventKind =
   | "arena-resolved"
   | "offer-posted"
   | "offer-closed"
-  | "dm-sent";
+  | "dm-sent"
+  | "price-signal-set"
+  | "price-vwap-update";
 
 export interface CityEvent {
   kind: CityEventKind;
