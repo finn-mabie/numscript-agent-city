@@ -1,5 +1,6 @@
 import type { Template, ParamSpec } from "@nac/template-engine";
 import { POST_OFFER_TOOL } from "./offers.js";
+import { SEND_DM_TOOL } from "./dms.js";
 
 // Anthropic-compatible tool shape. Kept structural to avoid coupling to any specific SDK version.
 export interface AnthropicTool {
@@ -98,5 +99,5 @@ export const IDLE_TOOL: AnthropicTool = {
 };
 
 export function toolsForTemplates(templates: Template[]): AnthropicTool[] {
-  return [...templates.map(toolFor), POST_OFFER_TOOL, IDLE_TOOL];
+  return [...templates.map(toolFor), POST_OFFER_TOOL, SEND_DM_TOOL, IDLE_TOOL];
 }

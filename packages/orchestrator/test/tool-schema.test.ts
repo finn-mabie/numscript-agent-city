@@ -19,10 +19,10 @@ const demo: Template = {
 };
 
 describe("tool-schema", () => {
-  it("generates one tool per template plus post_offer and idle tools", () => {
+  it("generates one tool per template plus post_offer, send_dm and idle tools", () => {
     const tools = toolsForTemplates([demo]);
-    expect(tools).toHaveLength(3);
-    expect(tools.map((t) => t.name).sort()).toEqual(["idle", "p2p_transfer", "post_offer"]);
+    expect(tools).toHaveLength(4);
+    expect(tools.map((t) => t.name).sort()).toEqual(["idle", "p2p_transfer", "post_offer", "send_dm"]);
   });
 
   it("maps monetary to an object with asset+amount", () => {
