@@ -331,7 +331,28 @@ export class GlyphScene extends Phaser.Scene {
   }
 
   private onCommit({ from, to, amount, txid }: GlyphCommitEvent) {
-    const pos = this.agentPos(to);
+    const fromPos = this.agentPos(from);
+    const toPos = this.agentPos(to);
+
+    // Draw a mint line between the two agents + a gold coin trail along it.
+    // Skip for self-txs (would be a 0-length line).
+    if (from !== to) {
+      const line = this.add.graphics();
+      line.lineStyle(1.5, 0xbaeabc, 0.9);
+      line.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+      line.setAlpha(0);
+      this.tweens.add({ targets: line, alpha: 1, duration: 140 });
+      this.tweens.add({
+        targets: line, alpha: 0,
+        delay: 900, duration: 500, ease: "cubic.in",
+        onComplete: () => line.destroy(),
+      });
+
+      // Coin trail riding on top of the line — 4 gold $ marks, staggered
+      this.fireCoinTrail(fromPos, toPos, COLORS.gold);
+    }
+
+    const pos = toPos;
     const c = this.add.container(pos.x + 16, pos.y - 4);
     const bg = this.add.rectangle(0, 0, 170, 58, 0x011e22, 1)
       .setStrokeStyle(1, 0xbaeabc).setOrigin(0, 0);

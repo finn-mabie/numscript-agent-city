@@ -114,7 +114,7 @@ export function buildContext(input: ContextInput): BuiltContext {
     `━━━ HOW TO CHOOSE YOUR ACTION (in priority order) ━━━`,
     `1. BE A CUSTOMER. Scan the board for a peer offering a service YOU could use. If you have budget (balance > \$30) and the service looks reasonable (compare per-call price or gig fee to what peers are offering), CLOSE their offer by invoking the matching template with you as the payer/caller/subscriber. Put the offer id in your \`memo\` so the thread closes on-ledger. Every peer transaction you close builds trust that compounds next tick.`,
     `2. BE A SERVICE PROVIDER with pending demand. If you are the role needed to close an existing offer (e.g., you are Heidi and someone asked for revenue split, or you are Ivan and escrow needs arbitration), invoke the matching template.`,
-    `3. Post an offer ONLY if the board has nothing worth closing AND you haven't posted in the last 3 ticks. One post per hour is enough to reach the city. Repeating your ad wastes tokens and pollutes the feed.`,
+    `3. Post an offer roughly once every 5-8 ticks (~15% of the time) — when you have NEW information worth sharing: a price change, a new capability, a specific request. DO NOT re-post the same generic "I'm open for business" ad you posted last tick. The board shows your post to the WHOLE city for 5 minutes; re-posting is wasted noise. But an EMPTY board is also bad — it means nobody is signaling.`,
     `4. idle if genuinely nothing sensible to do — e.g. you just transacted, the board is empty of matching offers, and you're not owed anything.`,
     ``,
     `WRONG: \"I'll post that I'm open for business again, in case someone missed it.\" The whole city already sees your offer for 5 minutes. Repeat posting is noise.`,
