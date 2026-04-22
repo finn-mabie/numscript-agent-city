@@ -394,3 +394,62 @@ export function dmRepo(db: Database.Database) {
     }
   };
 }
+
+// ── Price Signals ────────────────────────────────────────────────────────
+export interface PriceSignalRecord {
+  id: string;
+  assetCode: string;
+  targetPrice: number;
+  setByIpHash: string;
+  setAt: number;
+  expiresAt: number;
+  note: string | null;
+}
+
+export function priceSignalRepo(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT INTO price_signals (id, asset_code, target_price, set_by_ip_hash, set_at, expires_at, note)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const get = db.prepare(`SELECT * FROM price_signals WHERE id = ?`);
+  const active = db.prepare(`
+    SELECT * FROM price_signals
+    WHERE asset_code = ? AND expires_at > ?
+    ORDER BY set_at DESC LIMIT 1
+  `);
+  const recentByIpStmt = db.prepare(`
+    SELECT COUNT(*) AS c FROM price_signals
+    WHERE set_by_ip_hash = ? AND set_at >= ?
+  `);
+
+  const row2rec = (r: any): PriceSignalRecord => ({
+    id: r.id,
+    assetCode: r.asset_code,
+    targetPrice: r.target_price,
+    setByIpHash: r.set_by_ip_hash,
+    setAt: r.set_at,
+    expiresAt: r.expires_at,
+    note: r.note
+  });
+
+  return {
+    insert(args: {
+      id: string; assetCode: string; targetPrice: number;
+      setByIpHash: string; setAt: number; expiresAt: number; note: string | null;
+    }): void {
+      insert.run(args.id, args.assetCode, args.targetPrice, args.setByIpHash, args.setAt, args.expiresAt, args.note);
+    },
+    get(id: string): PriceSignalRecord | null {
+      const r = get.get(id);
+      return r ? row2rec(r) : null;
+    },
+    activeFor(assetCode: string, now: number): PriceSignalRecord | null {
+      const r = active.get(assetCode, now);
+      return r ? row2rec(r) : null;
+    },
+    recentByIp(ipHash: string, since: number): number {
+      const r = recentByIpStmt.get(ipHash, since) as { c: number };
+      return r?.c ?? 0;
+    }
+  };
+}
