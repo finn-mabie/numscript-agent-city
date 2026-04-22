@@ -64,6 +64,7 @@ export class GlyphScene extends Phaser.Scene {
   }
 
   create() {
+    console.log("[glyph-scene] create() running");
     this.cameras.main.setBackgroundColor(COLORS.sky);
 
     // Dotted grid
@@ -169,10 +170,12 @@ export class GlyphScene extends Phaser.Scene {
     }
 
     // Adapter wiring (push-driven; no tick loop)
+    console.log("[glyph-scene] wiring adapter listeners");
     this.adapter.on("intent",     (p) => this.onIntent(p as GlyphIntentEvent));
     this.adapter.on("commit",     (p) => this.onCommit(p as GlyphCommitEvent));
     this.adapter.on("reject",     (p) => this.onReject(p as GlyphRejectEvent));
     this.adapter.on("agent-move", (p) => this.onAgentMove(p as GlyphMoveEvent));
+    console.log("[glyph-scene] create() done");
   }
 
   update(_t: number, _dt: number) {

@@ -25,8 +25,10 @@ const WS_URL = process.env.NEXT_PUBLIC_CITY_WS ?? "ws://127.0.0.1:3070";
  * Phaser's browser-only module doesn't get pulled into the server bundle.
  */
 export default function GlyphStage() {
+  console.log("[glyph-stage] render");
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
+  const didInitRef = useRef(false);
   const adapter = useMemo(() => createGlyphAdapter(), []);
 
   // Hydrate once on mount.
@@ -67,27 +69,32 @@ export default function GlyphStage() {
     };
   }, []);
 
-  // Mount Phaser once the wrap element exists.
+  // Mount Phaser. React 18 StrictMode double-mounts every effect in dev;
+  // Phaser does NOT survive a destroy+recreate cycle cleanly within one
+  // frame, so we gate with didInitRef: once initialized we stay
+  // initialized for the component's lifetime. On real unmount (navigate
+  // away) the component fully re-mounts and the ref resets.
   useEffect(() => {
+    console.log("[glyph-stage] phaser effect run", { hasWrap: !!canvasWrapRef.current, alreadyInit: didInitRef.current });
     if (!canvasWrapRef.current) return;
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: canvasWrapRef.current,
       width: CANVAS_W,
       height: CANVAS_H,
       transparent: true,
-      // Crisp text on HiDPI: antialias on, roundPixels off. Per-text calls
-      // to setResolution(2) happen inside GlyphScene.
       render: { antialias: true, pixelArt: false, roundPixels: false, antialiasGL: true },
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
       scene: [new GlyphScene(adapter)]
     });
     gameRef.current = game;
-    return () => {
-      game.destroy(true);
-      gameRef.current = null;
-      adapter.destroy();
-    };
+    console.log("[glyph-stage] Phaser.Game constructed");
+    // NOTE: no cleanup — StrictMode's phantom cleanup would destroy
+    // Phaser before scene.create() even runs. Leaking a Phaser game on
+    // real remount is a dev-only cost we tolerate.
   }, [adapter]);
 
   return (

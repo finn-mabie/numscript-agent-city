@@ -33,6 +33,7 @@ export default function IntentBoardRail({ adapter }: { adapter: GlyphAdapter }) 
   const [flatLog, setFlatLog] = React.useState<LogRow[]>([]);
 
   React.useEffect(() => {
+    console.log("[intent-board] useEffect running, attaching listeners");
     const onIntent = ({ id, from, to, kind, summary, amount, judy, parent }: GlyphIntentEvent) => {
       setThreads((prev: Thread[]) => {
         const copy = [...prev];
