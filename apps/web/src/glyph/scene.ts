@@ -27,6 +27,7 @@ import type {
   GlyphDmEvent,
 } from "./store-adapter";
 import { dmLine } from "./dm-effects";
+import { formatAmount, hexFor, decimalsFor } from "./asset-palette";
 
 const COLORS = {
   sky:     "#011E22",
@@ -318,7 +319,7 @@ export class GlyphScene extends Phaser.Scene {
     this.coinTrails.push({ elems: dots, bornAt: this.time.now, duration: 1400 });
   }
 
-  private onCommit({ from, to, amount }: GlyphCommitEvent) {
+  private onCommit({ from, to, amount, asset }: GlyphCommitEvent) {
     // New choreography:
     //   1. If the two agents are in different zones, WALK the payer over
     //      to the payee. (Agents' home/zone tracked in agentSprites;
@@ -332,7 +333,7 @@ export class GlyphScene extends Phaser.Scene {
       const payerS = this.agentSprites.get(from);
       const payeeS = this.agentSprites.get(to);
       if (!payerS || !payeeS) {
-        this.flashCommit(from, to, amount);
+        this.flashCommit(from, to, amount, asset);
         return;
       }
 
@@ -342,7 +343,7 @@ export class GlyphScene extends Phaser.Scene {
         Math.abs(payerS.txt.x - payeeS.txt.x) < 70 &&
         Math.abs(payerS.txt.y - payeeS.txt.y) < 70;
       if (alreadyClose) {
-        this.flashCommit(from, to, amount);
+        this.flashCommit(from, to, amount, asset);
         return;
       }
 
@@ -358,7 +359,7 @@ export class GlyphScene extends Phaser.Scene {
         duration: 700,
         ease: "Sine.easeInOut",
         onComplete: () => {
-          this.flashCommit(from, to, amount);
+          this.flashCommit(from, to, amount, asset);
           // Linger at peer for 900ms, then return home
           this.time.delayedCall(900, () => {
             this.tweens.add({
@@ -373,21 +374,30 @@ export class GlyphScene extends Phaser.Scene {
         },
       });
     } else {
-      this.flashCommit(from, to, amount);
+      this.flashCommit(from, to, amount, asset);
     }
   }
 
   /**
-   * Two-party commit flash: glow halo on each agent + floating deltas.
-   * Payer loses money (red minus), payee gains money (green plus).
-   * Lasts ~1.4s, lightweight, no modal UI.
+   * Two-party commit flash: gold halo on payer (money-leaves), asset-tinted
+   * halo on payee. Floating deltas show -amount (red) / +amount (asset color).
+   * Amounts rendered via the asset palette — "$1.50", "3 🍓", "5 💻", etc.
+   * Lasts ~1.4s.
    */
-  private flashCommit(from: string, to: string, amount: number) {
+  private flashCommit(from: string, to: string, amount: number, asset?: string) {
     const payerS = this.agentSprites.get(from);
     const payeeS = this.agentSprites.get(to);
     if (!payerS) return;
 
-    // Halo on payer (gold/paid)
+    // `amount` arrives already scaled by amountFromParams (divided by 100 for
+    // USD). Scale it back to minor units using the asset's decimals before
+    // formatting — otherwise 3 strawberries would render as "0.03 🍓".
+    const minorAmount = Math.round(amount * Math.pow(10, decimalsFor(asset)));
+    const formatted = formatAmount(asset, minorAmount);
+    const assetHex = hexFor(asset);
+    const assetHexInt = Phaser.Display.Color.HexStringToColor(assetHex).color;
+
+    // Halo on payer (gold/paid) — unchanged
     const payerHalo = this.add.circle(payerS.txt.x, payerS.txt.y, 18, 0xd4a24a, 0.35);
     payerHalo.setStrokeStyle(1.5, 0xd4a24a, 0.9);
     this.tweens.add({
@@ -396,9 +406,9 @@ export class GlyphScene extends Phaser.Scene {
       onComplete: () => payerHalo.destroy(),
     });
 
-    // Payer delta: red minus, drifts up-left
+    // Payer delta: red minus with asset-formatted amount, drifts up-left
     if (amount > 0) {
-      const payerDelta = this.add.text(payerS.txt.x - 16, payerS.txt.y - 14, `−$${amount.toFixed(2)}`, {
+      const payerDelta = this.add.text(payerS.txt.x - 16, payerS.txt.y - 14, `−${formatted}`, {
         fontFamily: FONT, fontSize: "11px", color: COLORS.red,
         fontStyle: "bold",
       }).setResolution(2).setOrigin(0.5, 0.5);
@@ -411,10 +421,10 @@ export class GlyphScene extends Phaser.Scene {
       });
     }
 
-    // Halo + delta on payee (only when distinct from payer)
+    // Halo + delta on payee (only when distinct from payer), tinted by ASSET
     if (payeeS && payeeS !== payerS) {
-      const payeeHalo = this.add.circle(payeeS.txt.x, payeeS.txt.y, 18, 0xbaeabc, 0.35);
-      payeeHalo.setStrokeStyle(1.5, 0xbaeabc, 0.9);
+      const payeeHalo = this.add.circle(payeeS.txt.x, payeeS.txt.y, 18, assetHexInt, 0.35);
+      payeeHalo.setStrokeStyle(1.5, assetHexInt, 0.9);
       this.tweens.add({
         targets: payeeHalo, radius: 28, alpha: 0,
         duration: 900, ease: "cubic.out",
@@ -422,8 +432,8 @@ export class GlyphScene extends Phaser.Scene {
       });
 
       if (amount > 0) {
-        const payeeDelta = this.add.text(payeeS.txt.x + 16, payeeS.txt.y - 14, `+$${amount.toFixed(2)}`, {
-          fontFamily: FONT, fontSize: "11px", color: COLORS.mint,
+        const payeeDelta = this.add.text(payeeS.txt.x + 16, payeeS.txt.y - 14, `+${formatted}`, {
+          fontFamily: FONT, fontSize: "11px", color: assetHex,
           fontStyle: "bold",
         }).setResolution(2).setOrigin(0.5, 0.5);
         this.tweens.add({
