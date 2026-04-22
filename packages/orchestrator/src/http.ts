@@ -15,6 +15,8 @@ export interface StartHttpOptions {
   db: Database.Database;
   /** Returns the minor-unit balance of an account, or null on error. */
   getBalance: (address: string) => Promise<number | null>;
+  /** Optional — returns all asset balances for an account (minor units). Wired in run-city. */
+  getBalancesByAccount?: (address: string) => Promise<Map<string, number>>;
   /** Proxies an arbitrary GET against the Formance ledger's HTTP API. */
   ledgerGet: (path: string) => Promise<{ ok: boolean; status: number; body: unknown }>;
   /** How many recent intent-log entries per agent (default 20). */
@@ -159,15 +161,23 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       try {
         const agents = ag.list();
         const withBalances = await Promise.all(
-          agents.map(async (a) => ({
-            id: a.id,
-            name: a.name,
-            role: a.role,
-            tagline: a.tagline,
-            color: a.color,
-            hustleMode: a.hustleMode,
-            balance: (await opts.getBalance(`@agents:${a.id}:available`)) ?? 0
-          }))
+          agents.map(async (a) => {
+            const addr = `@agents:${a.id}:available`;
+            const usd = (await opts.getBalance(addr)) ?? 0;
+            const byAsset = opts.getBalancesByAccount
+              ? await opts.getBalancesByAccount(addr)
+              : new Map<string, number>();
+            return {
+              id: a.id,
+              name: a.name,
+              role: a.role,
+              tagline: a.tagline,
+              color: a.color,
+              hustleMode: a.hustleMode,
+              balance: usd,
+              balancesByAsset: Object.fromEntries(byAsset.entries())
+            };
+          })
         );
         const recent = agents.flatMap((a) => log.recent(a.id, limit));
         recent.sort((x, y) => y.createdAt - x.createdAt);
@@ -196,7 +206,12 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
 
         const accountData = extractData(accountRes.body);
         const txsData = extractCursorData(txsRes.body);
-        const balance = Number(accountData?.volumes?.["USD/2"]?.balance ?? 0);
+        const volumes = (accountData?.volumes ?? {}) as Record<string, { balance?: number | string }>;
+        const balance = Number(volumes?.["USD/2"]?.balance ?? 0);
+        const balancesByAsset: Record<string, number> = {};
+        for (const [asset, vol] of Object.entries(volumes)) {
+          balancesByAsset[asset] = Number(vol?.balance ?? 0);
+        }
         const metadata = accountData?.metadata ?? {};
 
         return json(res, 200, {
@@ -206,6 +221,7 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
             hustleMode: agent.hustleMode
           },
           balance,
+          balancesByAsset,
           metadata,
           transactions: (Array.isArray(txsData) ? txsData : [])
             .slice(0, 25)
