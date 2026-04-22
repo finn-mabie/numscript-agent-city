@@ -1,7 +1,6 @@
 // apps/web/src/glyph/store-adapter.ts
 import { useCityStore } from "../state/city-store";
 import { barrierKindFor } from "../phaser/barrier";
-import { glyphAgentById } from "./agent-map";
 
 export type GlyphBarrierKind = "schema" | "overdraft" | "unknown" | "seen";
 
@@ -109,16 +108,10 @@ export function createGlyphAdapter(): GlyphAdapter {
         emit("commit", {
           id: r.tickId, from: r.agentId, to: peer, amount, txid
         } as GlyphCommitEvent);
-        // Move the acting agent briefly toward their counterparty's zone —
-        // makes the city feel alive. Skip for post_offer / self-txs.
-        if (r.templateId && r.templateId !== "post_offer" && peer !== r.agentId) {
-          const peerHome = glyphAgentById(peer)?.home;
-          if (peerHome && peerHome !== "?") {
-            emit("agent-move", {
-              id: r.agentId, fromZone: "", toZone: peerHome, durationMs: 1100
-            } as GlyphMoveEvent);
-          }
-        }
+        // NOTE: the scene handles the walk-to-counterparty choreography
+        // itself inside onCommit (tween payer to payee, flash halos,
+        // then return home). We no longer emit a separate agent-move
+        // event here — it would race with the walk initiated in-scene.
       } else if (r.outcome === "rejected") {
         emittedTickIds.add(r.tickId);
         const barrier = mapBarrier(r.errorPhase, r.errorCode);

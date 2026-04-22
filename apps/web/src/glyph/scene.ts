@@ -330,72 +330,123 @@ export class GlyphScene extends Phaser.Scene {
     this.coinTrails.push({ elems: dots, bornAt: this.time.now, duration: 1400 });
   }
 
-  private onCommit({ from, to, amount, txid }: GlyphCommitEvent) {
-    const fromPos = this.agentPos(from);
-    const toPos = this.agentPos(to);
-
-    // Transaction line — bold mint stroke with a labeled midpoint
-    // ("Ⓑ → Ⓓ  $5") so you can read the deal without the receipt popup.
-    // Skip only when the two endpoints are literally the same agent.
+  private onCommit({ from, to, amount }: GlyphCommitEvent) {
+    // New choreography:
+    //   1. If the two agents are in different zones, WALK the payer over
+    //      to the payee. (Agents' home/zone tracked in agentSprites;
+    //      moveAgentTo handles the glide + auto-return after commit.)
+    //   2. After arrival, flash halos on both agents (gold=paid, mint=paid-to)
+    //      and float +/- amount deltas above each glyph.
+    //
+    // Self-transactions (waterfall_pay, liquidate_wallet) fire everything
+    // at the actor's current position with a neutral halo.
     if (from !== to) {
-      const line = this.add.graphics();
-      line.lineStyle(2.5, 0xbaeabc, 1);
-      line.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
-      line.setAlpha(0);
+      const payerS = this.agentSprites.get(from);
+      const payeeS = this.agentSprites.get(to);
+      if (!payerS || !payeeS) {
+        this.flashCommit(from, to, amount);
+        return;
+      }
 
-      // Midpoint label: glyph→glyph and amount, on a tiny pill that sits
-      // on the line. Fades in with the line, fades out ahead of it.
-      const fromGlyph = glyphOf(from);
-      const toGlyph = glyphOf(to);
-      const mx = (fromPos.x + toPos.x) / 2;
-      const my = (fromPos.y + toPos.y) / 2;
-      const labelStr = amount > 0
-        ? `${fromGlyph} → ${toGlyph}  $${amount.toFixed(0)}`
-        : `${fromGlyph} → ${toGlyph}`;
-      const pill = this.add.container(mx, my);
-      const pillTxt = this.add.text(0, 0, labelStr, {
-        fontFamily: FONT, fontSize: "10px", color: "#BAEABC",
-        backgroundColor: "#011e22",
-        padding: { left: 4, right: 4, top: 2, bottom: 2 },
-      }).setResolution(2).setOrigin(0.5, 0.5);
-      pill.add(pillTxt);
-      pill.setAlpha(0);
+      // If the payer is already at the payee's zone (possible from a
+      // previous move), skip the walk and fire immediately.
+      const alreadyClose =
+        Math.abs(payerS.txt.x - payeeS.txt.x) < 70 &&
+        Math.abs(payerS.txt.y - payeeS.txt.y) < 70;
+      if (alreadyClose) {
+        this.flashCommit(from, to, amount);
+        return;
+      }
 
-      this.tweens.add({ targets: [line, pill], alpha: 1, duration: 180 });
+      // Walk payer to a spot next to the payee, then flash on arrival.
+      const targetX = payeeS.txt.x + (Math.random() > 0.5 ? 22 : -22);
+      const targetY = payeeS.txt.y;
+      const origHome = { x: payerS.home.x, y: payerS.home.y };
+      payerS.tweenActive = true;
       this.tweens.add({
-        targets: [line, pill], alpha: 0,
-        delay: 1900, duration: 600, ease: "cubic.in",
-        onComplete: () => { line.destroy(); pill.destroy(); },
+        targets: [payerS.txt, payerS.lbl],
+        x: (tgt: Phaser.GameObjects.Text) => targetX,
+        y: (tgt: Phaser.GameObjects.Text) => tgt === payerS.lbl ? targetY + (payerS.agent.red ? 20 : 18) : targetY,
+        duration: 700,
+        ease: "Sine.easeInOut",
+        onComplete: () => {
+          this.flashCommit(from, to, amount);
+          // Linger at peer for 900ms, then return home
+          this.time.delayedCall(900, () => {
+            this.tweens.add({
+              targets: [payerS.txt, payerS.lbl],
+              x: (tgt: Phaser.GameObjects.Text) => origHome.x,
+              y: (tgt: Phaser.GameObjects.Text) => tgt === payerS.lbl ? origHome.y + (payerS.agent.red ? 20 : 18) : origHome.y,
+              duration: 700,
+              ease: "Sine.easeInOut",
+              onComplete: () => { payerS.tweenActive = false; },
+            });
+          });
+        },
       });
+    } else {
+      this.flashCommit(from, to, amount);
+    }
+  }
 
-      // Coin trail riding on top of the line — 5 gold $ marks, staggered
-      this.fireCoinTrail(fromPos, toPos, COLORS.gold);
+  /**
+   * Two-party commit flash: glow halo on each agent + floating deltas.
+   * Payer loses money (red minus), payee gains money (green plus).
+   * Lasts ~1.4s, lightweight, no modal UI.
+   */
+  private flashCommit(from: string, to: string, amount: number) {
+    const payerS = this.agentSprites.get(from);
+    const payeeS = this.agentSprites.get(to);
+    if (!payerS) return;
+
+    // Halo on payer (gold/paid)
+    const payerHalo = this.add.circle(payerS.txt.x, payerS.txt.y, 18, 0xd4a24a, 0.35);
+    payerHalo.setStrokeStyle(1.5, 0xd4a24a, 0.9);
+    this.tweens.add({
+      targets: payerHalo, radius: 28, alpha: 0,
+      duration: 900, ease: "cubic.out",
+      onComplete: () => payerHalo.destroy(),
+    });
+
+    // Payer delta: red minus, drifts up-left
+    if (amount > 0) {
+      const payerDelta = this.add.text(payerS.txt.x - 16, payerS.txt.y - 14, `−$${amount.toFixed(2)}`, {
+        fontFamily: FONT, fontSize: "11px", color: COLORS.red,
+        fontStyle: "bold",
+      }).setResolution(2).setOrigin(0.5, 0.5);
+      this.tweens.add({
+        targets: payerDelta,
+        y: payerDelta.y - 22,
+        alpha: 0,
+        duration: 1400, ease: "cubic.out",
+        onComplete: () => payerDelta.destroy(),
+      });
     }
 
-    const pos = toPos;
-    const c = this.add.container(pos.x + 16, pos.y - 4);
-    const bg = this.add.rectangle(0, 0, 170, 58, 0x011e22, 1)
-      .setStrokeStyle(1, 0xbaeabc).setOrigin(0, 0);
-    const pin = this.add.rectangle(0, 0, 2, 58, 0xbaeabc).setOrigin(0, 0);
-    const head = this.add.text(10, 6, `COMMIT · tx ${txid}`, {
-      fontFamily: FONT, fontSize: "8px", color: COLORS.mint, letterSpacing: 1.2,
-    }).setResolution(2);
-    const l1 = this.add.text(10, 20, `+ $${amount.toFixed(2)}`, {
-      fontFamily: FONT, fontSize: "11px", color: COLORS.gold,
-    }).setResolution(2);
-    // Resolve 3-digit agent ids to glyphs for the transfer line
-    const fromGlyph = glyphOf(from);
-    const toGlyph = glyphOf(to);
-    const l2 = this.add.text(10, 34, `${fromGlyph} → ${toGlyph}`, {
-      fontFamily: FONT, fontSize: "9px", color: COLORS.ink,
-    }).setResolution(2);
-    const l3 = this.add.text(10, 46, "OK", {
-      fontFamily: FONT, fontSize: "9px", color: COLORS.mint,
-    }).setResolution(2);
-    c.add([bg, pin, head, l1, l2, l3]);
-    c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, y: c.y - 6, duration: 180 });
-    this.receipts.push({ container: c, bornAt: this.time.now, duration: 1800 });
+    // Halo + delta on payee (only when distinct from payer)
+    if (payeeS && payeeS !== payerS) {
+      const payeeHalo = this.add.circle(payeeS.txt.x, payeeS.txt.y, 18, 0xbaeabc, 0.35);
+      payeeHalo.setStrokeStyle(1.5, 0xbaeabc, 0.9);
+      this.tweens.add({
+        targets: payeeHalo, radius: 28, alpha: 0,
+        duration: 900, ease: "cubic.out",
+        onComplete: () => payeeHalo.destroy(),
+      });
+
+      if (amount > 0) {
+        const payeeDelta = this.add.text(payeeS.txt.x + 16, payeeS.txt.y - 14, `+$${amount.toFixed(2)}`, {
+          fontFamily: FONT, fontSize: "11px", color: COLORS.mint,
+          fontStyle: "bold",
+        }).setResolution(2).setOrigin(0.5, 0.5);
+        this.tweens.add({
+          targets: payeeDelta,
+          y: payeeDelta.y - 22,
+          alpha: 0,
+          duration: 1400, ease: "cubic.out",
+          onComplete: () => payeeDelta.destroy(),
+        });
+      }
+    }
   }
 
   private onReject({ from, barrier }: GlyphRejectEvent) {
