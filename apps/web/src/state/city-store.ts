@@ -9,6 +9,7 @@ export interface AgentView {
   tagline: string;
   color: string;
   balance: number;        // USD/2 minor units
+  balancesByAsset?: Record<string, number>;  // full per-asset map from /snapshot
   hustleMode: 0 | 1;
   x: number;              // tile coord; assigned at snapshot time
   y: number;
@@ -132,7 +133,11 @@ export const useCityStore = create<CityState>((set) => ({
     const byId: Record<string, AgentView> = {};
     for (const a of agents) {
       const [x, y] = START_POSITIONS[a.id] ?? [0, 0];
-      byId[a.id] = { ...a, x, y };
+      byId[a.id] = {
+        ...a,
+        x, y,
+        balancesByAsset: (a as any).balancesByAsset ?? undefined
+      };
     }
     set({ agents: byId, recent: recent.slice(0, RECENT_CAP) });
   },

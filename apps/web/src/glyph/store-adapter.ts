@@ -16,6 +16,7 @@ export interface GlyphIntentEvent {
 }
 export interface GlyphCommitEvent {
   id: string; from: string; to: string; amount: number; txid: string;
+  asset?: string;  // e.g. "USD/2", "STRAWBERRY/0"
 }
 export interface GlyphRejectEvent {
   id: string; from: string; to: string; amount: number; txid: string;
@@ -115,7 +116,8 @@ export function createGlyphAdapter(): GlyphAdapter {
       if (r.outcome === "committed") {
         emittedTickIds.add(r.tickId);
         emit("commit", {
-          id: r.tickId, from: r.agentId, to: peer, amount, txid
+          id: r.tickId, from: r.agentId, to: peer, amount, txid,
+          asset: assetFromParams(r.params)
         } as GlyphCommitEvent);
         // NOTE: the scene handles the walk-to-counterparty choreography
         // itself inside onCommit (tween payer to payee, flash halos,
@@ -223,6 +225,19 @@ function counterpartyFromParams(params: unknown, actorId: string): string | unde
     if (typeof v !== "string") continue;
     const m = v.match(/^@agents:([0-9]{3}):.+$/);
     if (m && m[1] && m[1] !== actorId) return m[1];
+  }
+  return undefined;
+}
+
+function assetFromParams(params: unknown): string | undefined {
+  if (!params || typeof params !== "object") return undefined;
+  const p = params as Record<string, unknown>;
+  // Standard monetary params: `amount`, `give`, `take`, `total`
+  for (const key of ["amount", "give", "take", "total"]) {
+    const m = p[key];
+    if (m && typeof m === "object" && m !== null && "asset" in m) {
+      return String((m as { asset: unknown }).asset);
+    }
   }
   return undefined;
 }
