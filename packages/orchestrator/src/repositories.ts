@@ -328,6 +328,12 @@ export function dmRepo(db: Database.Database) {
     SELECT COUNT(*) AS c FROM dms
     WHERE expires_at < ? AND read_at IS NULL
   `);
+  const involving = db.prepare(`
+    SELECT * FROM dms
+    WHERE from_agent_id = ? OR to_agent_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
 
   const row2rec = (r: any): DmRecord => ({
     id: r.id,
@@ -382,6 +388,9 @@ export function dmRepo(db: Database.Database) {
     expireOlderThan(now: number): number {
       const r = countExpired.get(now) as { c: number };
       return r?.c ?? 0;
+    },
+    involvingAgent(agentId: string, limit: number): DmRecord[] {
+      return (involving.all(agentId, agentId, limit) as any[]).map(row2rec);
     }
   };
 }

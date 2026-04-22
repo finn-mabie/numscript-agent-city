@@ -6,6 +6,7 @@ import { agentRepo, intentLogRepo } from "./repositories.js";
 import type { ArenaQueue } from "./arena.js";
 import type { arenaRepo } from "./repositories.js";
 import type { offerRepo as offerRepoFactory } from "./repositories.js";
+import type { dmRepo as dmRepoFactory } from "./repositories.js";
 import { newAttackId, hashPrompt, hashIp, promptPreview } from "./arena.js";
 import { createRateLimiter, type RateLimiter } from "./rate-limit.js";
 
@@ -35,6 +36,7 @@ export interface StartHttpOptions {
   /** Absolute path to the templates root. When set, /template/:id and /templates are exposed. */
   templatesRoot?: string;
   offerRepo?: ReturnType<typeof offerRepoFactory>;
+  dmRepo?: ReturnType<typeof dmRepoFactory>;
 }
 
 export interface HttpHandle {
@@ -292,6 +294,18 @@ export async function startHttp(opts: StartHttpOptions): Promise<HttpHandle> {
       const rootId = offer.inReplyTo ?? offer.id;
       const thread = opts.offerRepo.threadOf(rootId);
       return json(res, 200, { offer, thread });
+    }
+
+    // ── /dms/agent/:id ──────────────────────────────────────────────────
+    // Returns the most-recent 50 DMs involving this agent (either as sender
+    // or recipient), newest-first. Used by AgentPanel's Conversations tab.
+    const dmsMatch = path.match(/^\/dms\/agent\/(\d{3})$/);
+    if (dmsMatch) {
+      if (!opts.dmRepo) return json(res, 503, { error: "dms not configured" });
+      const id = dmsMatch[1];
+      if (!ag.get(id)) return json(res, 404, { error: `agent ${id} not found` });
+      const list = opts.dmRepo.involvingAgent(id, 50);
+      return json(res, 200, { agentId: id, dms: list });
     }
 
     json(res, 404, { error: "not found" });
